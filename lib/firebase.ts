@@ -3,13 +3,13 @@ import { getAnalytics, Analytics } from "firebase/analytics";
 import { Auth, getAuth } from "firebase/auth";
 
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
+  apiKey: "AIzaSyBZ3jiAeOyQDi9GBgIePFP8pPU035oh6ag",
+  authDomain: "pandora-43736.firebaseapp.com",
+  projectId: "pandora-43736",
+  storageBucket: "pandora-43736.firebasestorage.app",
+  messagingSenderId: "212691894027",
+  appId: "1:212691894027:web:65917e617ed57257afac0e",
+  measurementId: "G-07TTGE58C4"
 };
 
 let app: FirebaseApp;

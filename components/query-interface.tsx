@@ -41,9 +41,13 @@ import {
   UserCircle,
 } from "lucide-react"
 import { QueryResult } from "@/components/query-result"
-import { getCurrentUser, logout, isVipOrAdmin } from "@/lib/auth"
+import { logout, isVipOrAdmin, User as AuthUser } from "@/lib/auth"
 import { SplashScreen } from "@/components/splash-screen"
 import { useRouter } from "next/navigation"
+
+interface QueryInterfaceProps {
+  user: AuthUser | null
+}
 
 const queryCategories = [
   {
@@ -181,73 +185,7 @@ const queryCategories = [
   },
 ]
 
-const getApiEndpoint = (queryId: string, api: string) => {
-  if (api === "hanedan") {
-    const endpointMap: Record<string, string> = {
-      hanedan_ad_soyad: "adsoyad.php",
-      hanedan_ad_soyad_pro: "adsoyadpro.php",
-      hanedan_ad_il_ilce: "adililce.php",
-      hanedan_tcpro: "tcpro.php",
-      hanedan_tc: "tc.php",
-      hanedan_tc_gsm: "tcgsm.php",
-      hanedan_gsm_tc: "gsmtc.php",
-      hanedan_adres: "adres.php",
-      hanedan_hane: "hane.php",
-      hanedan_aile: "aile.php",
-      hanedan_sulale: "sulale.php",
-      hanedan_ogretmen: "ogretmen.php",
-      hanedan_okulno: "okulno.php",
-      hanedan_lgs: "lgs.php",
-      hanedan_uni: "uni.php",
-      hanedan_sertifika: "sertifika.php",
-      hanedan_vesika: "vesika.php",
-      hanedan_tapu: "tapu.php",
-      hanedan_is_kaydi: "iskaydi.php",
-      hanedan_secmen: "secmen.php",
-      hanedan_facebook: "facebook.php",
-      hanedan_instagram: "insta.php",
-      hanedan_log: "log.php",
-      hanedan_internet_ariza: "İnternetAriza.php",
-      hanedan_plaka: "plaka.php",
-      hanedan_isim_plaka: "plakaismi.php",
-      hanedan_plaka_borc: "plakaborc.php",
-      hanedan_plaka_parca: "PlakaParca.php",
-      hanedan_papara: "papara.php",
-      hanedan_ininal: "ininal.php",
-      hanedan_firma: "firma.php",
-      hanedan_operator: "operator.php",
-      hanedan_yabanci: "yabanci.php",
-      hanedan_craftrise: "craftrise.php",
-      hanedan_akp: "akp.php",
-      hanedan_smsbomber: "smsbomber.php",
-      hanedan_aifoto: "AiFoto.php",
-    }
-    return `https://hanedansystem.alwaysdata.net/hanesiz/${endpointMap[queryId]}`
-  }
-  const pandoraEndpointMap: Record<string, string> = {
-    ad_soyad: "ad_soyad",
-    tc_sorgulama: "tc_sorgulama",
-    tcpro: "tc_pro_sorgulama",
-    telegram: "telegram",
-    ip: "ip",
-    dns: "dns",
-    subdomain: "subdomain",
-    sifre_encrypt: "sifre_encrypt",
-    e_kurs: "e_kurs",
-    ip_premium: "ip_premium",
-    ada_parsel: "ada_parsel",
-    sertifika2: "sertifika2",
-    vergi_levhasi: "vergi_levhasi",
-    facebook_hanedan: "facebook_hanedan",
-    diploma: "diploma",
-    internet: "internet",
-    interpol: "interpol",
-    hava_durumu: "hava_durumu",
-  }
-  return `https://x.sorgu-api.rf.gd/pandora/${pandoraEndpointMap[queryId] || queryId}`
-}
-
-export function QueryInterface() {
+export function QueryInterface({ user }: QueryInterfaceProps) {
   const [selectedQuery, setSelectedQuery] = useState<string | null>(null)
   const [queryParams, setQueryParams] = useState<Record<string, string>>({})
   const [result, setResult] = useState<any>(null)
@@ -257,7 +195,6 @@ export function QueryInterface() {
   const [showSplash, setShowSplash] = useState(false)
   const router = useRouter()
 
-  const user = getCurrentUser()
   const canExecuteQuery = isVipOrAdmin(user)
 
   const handleLogout = () => {
@@ -393,7 +330,7 @@ export function QueryInterface() {
                 <Settings className="h-4 w-4 md:h-5 md:w-5" />
               </Button>
               <div className="text-right hidden sm:block">
-                <p className="text-sm font-medium text-foreground">{user?.username}</p>
+                <p className="text-sm font-medium text-foreground">{user?.email}</p>
                 <Badge
                   variant={user?.role === "admin" ? "default" : user?.role === "vip" ? "secondary" : "outline"}
                   className="text-xs"

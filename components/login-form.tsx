@@ -7,33 +7,49 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { login } from "@/lib/auth"
 import { Shield, AlertCircle } from "lucide-react"
+import { auth } from "@/lib/firebase"
+import { signInWithEmailAndPassword } from "firebase/auth"
+import { useRouter } from "next/navigation"
 
 interface LoginFormProps {
   onLoginSuccess: () => void
 }
 
 export function LoginForm({ onLoginSuccess }: LoginFormProps) {
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
-    await new Promise((resolve) => setTimeout(resolve, 500))
+    let finalEmail = email;
+    let finalPassword = password;
 
-    const user = login(username, password)
-    if (user) {
-      onLoginSuccess()
-    } else {
-      setError("Kullanıcı adı veya şifre hatalı")
+    // Demo user check
+    if (email === "demo" && password === "demo") {
+      // Use a real demo account's credentials
+      finalEmail = "demo@example.com";
+      finalPassword = "demopassword";
     }
-    setIsLoading(false)
+
+    try {
+      await signInWithEmailAndPassword(auth, finalEmail, finalPassword)
+      onLoginSuccess()
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setError("E-posta veya şifre hatalı.")
+      } else {
+        setError("Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.")
+      }
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -51,13 +67,13 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username">Kullanıcı Adı</Label>
+              <Label htmlFor="email">E-posta</Label>
               <Input
-                id="username"
+                id="email"
                 type="text"
-                placeholder="Kullanıcı adınızı girin"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                placeholder="E-postanızı veya 'demo' yazın"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
                 className="bg-slate-800/50"

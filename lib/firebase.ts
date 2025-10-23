@@ -12,19 +12,13 @@ const firebaseConfig = {
   measurementId: "G-07TTGE58C4"
 };
 
-let app: FirebaseApp;
-let auth: Auth;
+// Initialize Firebase
+const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
+const auth: Auth = getAuth(app);
 let analytics: Analytics | null = null;
 
-if (typeof window !== "undefined" && !getApps().length) {
-  app = initializeApp(firebaseConfig);
-  auth = getAuth(app);
-  if ("measurementId" in firebaseConfig) {
-    analytics = getAnalytics(app);
-  }
-} else {
-  app = getApp();
-  auth = getAuth(app);
+// Initialize Analytics only on the client side
+if (typeof window !== 'undefined') {
   if ("measurementId" in firebaseConfig) {
     analytics = getAnalytics(app);
   }

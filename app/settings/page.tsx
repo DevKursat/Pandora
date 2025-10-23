@@ -8,13 +8,14 @@ import { Label } from "@/components/ui/label"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { getCurrentUser } from "@/lib/auth"
+import { onAuthUserChanged, User } from "@/lib/auth"
 import { SplashScreen } from "@/components/splash-screen"
 import { Shield, ArrowLeft, SettingsIcon, Bell, Eye, Database } from "lucide-react"
 
 export default function SettingsPage() {
   const [showSplash, setShowSplash] = useState(true)
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [isChecking, setIsChecking] = useState(true)
   const [settings, setSettings] = useState({
     notifications: true,
     emailAlerts: false,
@@ -30,15 +31,25 @@ export default function SettingsPage() {
   const router = useRouter()
 
   useEffect(() => {
-    const currentUser = getCurrentUser()
-    if (!currentUser) {
-      router.push("/")
-    } else {
-      setUser(currentUser)
-    }
+    const unsubscribe = onAuthUserChanged((user) => {
+      if (!user) {
+        router.push("/")
+      } else {
+        setUser(user)
+      }
+      setIsChecking(false)
+    })
+    return () => unsubscribe()
   }, [router])
 
-  if (showSplash) {
+  useEffect(() => {
+    // Hide splash screen after a delay
+    const timer = setTimeout(() => setShowSplash(false), 1500)
+    return () => clearTimeout(timer)
+  }, [])
+
+
+  if (showSplash || isChecking) {
     return <SplashScreen onComplete={() => setShowSplash(false)} duration={1500} />
   }
 

@@ -59,7 +59,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
           <div className="space-y-2 text-center">
             <CardTitle className="text-2xl font-bold flex items-center justify-center gap-2">
               <Shield className="w-6 h-6 text-primary" />
-              Pandora
+              PANDORA - DÜZELTİLMİŞ VERSİYON
             </CardTitle>
             <CardDescription>Sorgu Sistemi</CardDescription>
           </div>

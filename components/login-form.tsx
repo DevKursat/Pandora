@@ -59,7 +59,7 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
           <div className="space-y-2 text-center">
             <CardTitle className="text-2xl font-bold flex items-center justify-center gap-2">
               <Shield className="w-6 h-6 text-primary" />
-              PANDORA - DÜZELTİLMİŞ VERSİYON
+              Pandora
             </CardTitle>
             <CardDescription>Sorgu Sistemi</CardDescription>
           </div>
@@ -114,9 +114,6 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                   @ErSocietyPlus
                 </a>
               </p>
-            </div>
-            <div className="text-center mt-4">
-              <p className="text-xs font-bold text-green-400">SÜRÜM 2.0 - TÜM HATALAR DÜZELTİLDİ</p>
             </div>
           </form>
         </CardContent>

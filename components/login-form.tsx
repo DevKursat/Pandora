@@ -115,6 +115,9 @@ export function LoginForm({ onLoginSuccess }: LoginFormProps) {
                 </a>
               </p>
             </div>
+            <div className="text-center mt-4">
+              <p className="text-xs font-bold text-green-400">SÜRÜM 2.0 - TÜM HATALAR DÜZELTİLDİ</p>
+            </div>
           </form>
         </CardContent>
       </Card>

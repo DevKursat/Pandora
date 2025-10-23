@@ -1,14 +1,38 @@
 import { type NextRequest, NextResponse } from "next/server"
+import fs from "fs/promises"
+import path from "path"
+
+// Helper function to write logs
+async function writeToLog(logData: any) {
+  const logFilePath = path.join(process.cwd(), "query_debug.log")
+  const timestamp = new Date().toISOString()
+  const logContent = `[${timestamp}] ${JSON.stringify(logData, null, 2)}\n\n`
+
+  try {
+    await fs.appendFile(logFilePath, logContent)
+  } catch (error) {
+    console.error("Failed to write to log file:", error)
+  }
+}
 
 export async function POST(request: NextRequest) {
+  const logData: any = {
+    step: "start",
+    request: {
+      headers: Object.fromEntries(request.headers),
+      method: request.method,
+      url: request.url,
+    },
+  }
+
   try {
     const body = await request.json()
+    logData.body = body
     const { queryId, params, api } = body
 
     let url: string
 
     if (api === "hanedan") {
-      // Hanedan API endpoint mapping
       const endpointMap: Record<string, string> = {
         hanedan_ad_soyad: "adsoyad.php",
         hanedan_ad_soyad_pro: "adsoyadpro.php",
@@ -48,16 +72,13 @@ export async function POST(request: NextRequest) {
         hanedan_smsbomber: "smsbomber.php",
         hanedan_aifoto: "AiFoto.php",
       }
-
       const endpoint = endpointMap[queryId]
       if (!endpoint) {
         return NextResponse.json({ error: "Geçersiz sorgu türü" }, { status: 400 })
       }
-
       const queryParams = new URLSearchParams(params)
       url = `https://hanedansystem.alwaysdata.net/hanesiz/${endpoint}?${queryParams}`
     } else {
-      // Pandora API
       const queryParams = new URLSearchParams({
         api_key: "207736",
         ...params,
@@ -65,7 +86,8 @@ export async function POST(request: NextRequest) {
       url = `https://x.sorgu-api.rf.gd/pandora/${queryId}?${queryParams}`
     }
 
-    console.log("[v0] Making request to:", url)
+    logData.step = "url_created"
+    logData.external_url = url
 
     const response = await fetch(url, {
       method: "GET",
@@ -74,17 +96,39 @@ export async function POST(request: NextRequest) {
       },
     })
 
+    logData.step = "api_response_received"
+    logData.response = {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers),
+    }
+
+    const responseText = await response.text()
+    logData.response_body = responseText
+
     if (!response.ok) {
-      console.log("[v0] API response not OK:", response.status, response.statusText)
+      await writeToLog(logData)
       return NextResponse.json({ error: "API isteği başarısız oldu" }, { status: response.status })
     }
 
-    const data = await response.json()
-    console.log("[v0] API response received successfully")
-
-    return NextResponse.json(data)
-  } catch (error) {
-    console.error("[v0] Query error:", error)
+    try {
+      const data = JSON.parse(responseText)
+      logData.step = "success"
+      await writeToLog(logData)
+      return NextResponse.json(data)
+    } catch (e) {
+      logData.step = "json_parse_error"
+      await writeToLog(logData)
+      // Return the raw text if it's not JSON
+      return NextResponse.json({ result: responseText })
+    }
+  } catch (error: any) {
+    logData.step = "internal_error"
+    logData.error = {
+      message: error.message,
+      stack: error.stack,
+    }
+    await writeToLog(logData)
     return NextResponse.json({ error: "Sorgu sırasında bir hata oluştu" }, { status: 500 })
   }
 }

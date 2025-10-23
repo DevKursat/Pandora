@@ -4,22 +4,26 @@ import { useState, useEffect } from "react"
 import { QueryInterface } from "@/components/query-interface"
 import { LoginForm } from "@/components/login-form"
 import { SplashScreen } from "@/components/splash-screen"
+import { onAuthUserChanged, User } from "@/lib/auth"
 import { MaintenancePage } from "@/components/maintenance-page"
-import { getCurrentUser } from "@/lib/auth"
 import { isMaintenanceMode } from "@/lib/maintenance"
 
 export default function Home() {
   const [showSplash, setShowSplash] = useState(true)
-  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [user, setUser] = useState<User | null>(null)
   const [isChecking, setIsChecking] = useState(true)
   const [maintenance, setMaintenance] = useState(false)
 
   useEffect(() => {
     setMaintenance(isMaintenanceMode())
 
-    const user = getCurrentUser()
-    setIsAuthenticated(!!user)
-    setIsChecking(false)
+    const unsubscribe = onAuthUserChanged((user) => {
+      setUser(user)
+      setIsChecking(false)
+    })
+
+    // Cleanup subscription on unmount
+    return () => unsubscribe()
   }, [])
 
   if (showSplash) {
@@ -31,11 +35,12 @@ export default function Home() {
   }
 
   if (isChecking) {
+    // You can return a loader here if you want
     return null
   }
 
-  if (!isAuthenticated) {
-    return <LoginForm onLoginSuccess={() => setIsAuthenticated(true)} />
+  if (!user) {
+    return <LoginForm onLoginSuccess={() => setIsChecking(true)} />
   }
 
   return (

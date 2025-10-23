@@ -10,24 +10,34 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { onAuthUserChanged, User } from "@/lib/auth"
 import { SplashScreen } from "@/components/splash-screen"
+import { useToast } from "@/components/ui/use-toast"
+import { Toaster } from "@/components/ui/toaster"
 import { Shield, ArrowLeft, SettingsIcon, Bell, Eye, Database } from "lucide-react"
+
+const SETTINGS_KEY = "pandora_user_settings"
 
 export default function SettingsPage() {
   const [showSplash, setShowSplash] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [isChecking, setIsChecking] = useState(true)
-  const [settings, setSettings] = useState({
-    notifications: true,
-    emailAlerts: false,
-    queryHistory: true,
-    autoSave: true,
-    darkMode: true,
-    language: "tr",
-    resultsPerPage: "20",
-    cacheResults: true,
-    twoFactorAuth: false,
-    sessionTimeout: "30",
-  })
+  const { toast } = useToast()
+
+  const [settings, setSettings] = useState(() => {
+    if (typeof window === 'undefined') {
+      return {
+        notifications: true, emailAlerts: false, queryHistory: true, autoSave: true,
+        darkMode: true, language: "tr", resultsPerPage: "20", cacheResults: true,
+        twoFactorAuth: false, sessionTimeout: "30",
+      };
+    }
+    const savedSettings = localStorage.getItem(SETTINGS_KEY);
+    return savedSettings ? JSON.parse(savedSettings) : {
+      notifications: true, emailAlerts: false, queryHistory: true, autoSave: true,
+      darkMode: true, language: "tr", resultsPerPage: "20", cacheResults: true,
+      twoFactorAuth: false, sessionTimeout: "30",
+    };
+  });
+
   const router = useRouter()
 
   useEffect(() => {
@@ -43,10 +53,37 @@ export default function SettingsPage() {
   }, [router])
 
   useEffect(() => {
-    // Hide splash screen after a delay
     const timer = setTimeout(() => setShowSplash(false), 1500)
     return () => clearTimeout(timer)
   }, [])
+
+  const handleSettingChange = (key: string, value: any) => {
+    setSettings((prev: any) => ({ ...prev, [key]: value }))
+  }
+
+  const handleSaveChanges = () => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    toast({
+      title: "Ayarlar Kaydedildi",
+      description: "Yaptığınız değişiklikler başarıyla kaydedildi.",
+    })
+
+    // Apply dark mode immediately
+    if (settings.darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }
+
+  useEffect(() => {
+    // Apply dark mode on initial load
+    if (settings.darkMode) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [settings.darkMode]);
 
 
   if (showSplash || isChecking) {
@@ -55,12 +92,9 @@ export default function SettingsPage() {
 
   if (!user) return null
 
-  const handleSettingChange = (key: string, value: any) => {
-    setSettings((prev) => ({ ...prev, [key]: value }))
-  }
-
   return (
     <div className="min-h-screen animated-bg">
+       <Toaster />
       <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-xl sticky top-0 z-10">
         <div className="container mx-auto px-4 py-3 md:py-4">
           <div className="flex items-center justify-between gap-2">
@@ -265,7 +299,7 @@ export default function SettingsPage() {
           <Button variant="outline" onClick={() => router.push("/")} className="w-full sm:w-auto" size="sm">
             İptal
           </Button>
-          <Button className="w-full sm:w-auto" size="sm">
+          <Button className="w-full sm:w-auto" size="sm" onClick={handleSaveChanges}>
             Değişiklikleri Kaydet
           </Button>
         </div>

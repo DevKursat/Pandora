@@ -52,9 +52,11 @@ import {
   Clock,
 } from "lucide-react"
 
+import { useAuth } from "@/hooks/useAuth"
+
 export default function AdminPanel() {
+  const { user: authUser, loading: authLoading } = useAuth()
   const [showSplash, setShowSplash] = useState(true)
-  const [isAuthorized, setIsAuthorized] = useState(false)
   const [users, setUsers] = useState<any[]>([])
   const [queryLogs, setQueryLogs] = useState<any[]>([])
   const [activeUsers, setActiveUsers] = useState<string[]>([])
@@ -101,17 +103,19 @@ export default function AdminPanel() {
   const router = useRouter()
 
   useEffect(() => {
-    const adminAuth = localStorage.getItem("adminAuth")
-    if (adminAuth !== "true") {
-      router.push("/boss/login")
-    } else {
-      setIsAuthorized(true)
-      loadAdminData()
+    if (!authLoading) {
+      // Yükleme tamamlandıktan sonra, kullanıcı yoksa veya admin değilse login sayfasına yönlendir.
+      if (!authUser || authUser.role !== 'admin') {
+        router.push("/boss/login");
+      } else {
+        loadAdminData();
+      }
     }
-  }, [router])
+  }, [authUser, authLoading, router])
 
   useEffect(() => {
-    if (!isAuthorized) return
+    // Sadece admin yetkisine sahip kullanıcılar için periyodik veri yenileme
+    if (authUser?.role !== 'admin') return
 
     const interval = setInterval(() => {
       loadAdminData()
@@ -119,12 +123,14 @@ export default function AdminPanel() {
     }, 5000)
 
     return () => clearInterval(interval)
-  }, [isAuthorized])
+  }, [authUser])
 
   const loadAdminData = async () => {
     try {
+      // Artık tüm kullanıcıları doğrudan /api/admin/users'dan çekiyoruz.
+      // Cihaz ve diğer bilgiler zaten bu yanıta dahil ediliyor.
       const [usersRes, logsRes, activeRes] = await Promise.all([
-        fetch("/api/admin/devices"), // Updated to fetch users with device info
+        fetch("/api/admin/users"),
         fetch("/api/admin/logs"),
         fetch("/api/admin/active"),
       ])
@@ -139,6 +145,7 @@ export default function AdminPanel() {
 
   const loadUserDevices = async (userId: string) => {
     try {
+      // API'ler artık daha spesifik, bu yüzden ayrı çağrılar yapıyoruz.
       const [devicesRes, historyRes] = await Promise.all([
         fetch(`/api/admin/devices?userId=${userId}&type=devices`),
         fetch(`/api/admin/devices?userId=${userId}&type=history`),
@@ -153,13 +160,14 @@ export default function AdminPanel() {
 
   const handleViewDevices = async (user: any) => {
     setSelectedUser(user)
-    await loadUserDevices(user.id)
+    // Firebase UID'sini kullan
+    await loadUserDevices(user.uid)
     setIsDeviceDialogOpen(true)
   }
 
   const handleAddUser = async () => {
-    if (!newUser.username || !newUser.password) {
-      alert("Kullanıcı adı ve şifre zorunludur!")
+    if (!newUser.email || !newUser.password) {
+      alert("E-posta ve şifre zorunludur!")
       return
     }
 
@@ -169,6 +177,8 @@ export default function AdminPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(newUser),
       })
+
+      const result = await response.json()
 
       if (response.ok) {
         setIsAddUserOpen(false)
@@ -200,10 +210,12 @@ export default function AdminPanel() {
         })
         loadAdminData()
         alert("Kullanıcı başarıyla eklendi!")
+      } else {
+        alert(`Kullanıcı eklenemedi: ${result.error}`)
       }
     } catch (error) {
       console.error("Failed to add user:", error)
-      alert("Kullanıcı eklenirken hata oluştu!")
+      alert("Kullanıcı eklenirken bir hata oluştu!")
     }
   }
 
@@ -211,10 +223,14 @@ export default function AdminPanel() {
     if (!confirm("Bu kullanıcıyı silmek istediğinizden emin misiniz?")) return
 
     try {
+      // Firebase UID'sini kullan
       const response = await fetch(`/api/admin/users?id=${userId}`, { method: "DELETE" })
       if (response.ok) {
         loadAdminData()
         alert("Kullanıcı silindi!")
+      } else {
+        const result = await response.json();
+        alert(`Kullanıcı silinemedi: ${result.error}`)
       }
     } catch (error) {
       console.error("Failed to delete user:", error)
@@ -223,13 +239,19 @@ export default function AdminPanel() {
 
   const handleUpdateRole = async (userId: string, role: string, vipExpiry?: string) => {
     try {
+      // Firebase UID'sini kullan
       const response = await fetch("/api/admin/users", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, role, vipExpiry }),
       })
 
-      if (response.ok) loadAdminData()
+      if (response.ok) {
+        loadAdminData()
+      } else {
+        const result = await response.json();
+        alert(`Rol güncellenemedi: ${result.error}`)
+      }
     } catch (error) {
       console.error("Failed to update user:", error)
     }
@@ -308,11 +330,12 @@ export default function AdminPanel() {
     }
   }
 
-  if (showSplash) {
+  if (authLoading || showSplash) {
     return <SplashScreen onComplete={() => setShowSplash(false)} duration={1500} />
   }
 
-  if (!isAuthorized) {
+  // Yükleme tamamlandıysa ve kullanıcı admin değilse, hiçbir şey render etme (yönlendirme gerçekleşiyor).
+  if (authUser?.role !== 'admin') {
     return null
   }
 
@@ -763,7 +786,7 @@ export default function AdminPanel() {
                 <div className="space-y-3">
                   {users.map((user) => (
                     <div
-                      key={user.id}
+                      key={user.uid}
                       className="flex items-center justify-between p-3 md:p-4 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-primary/50 transition-colors flex-wrap gap-3"
                     >
                       <div className="flex items-center gap-3 md:gap-4">
@@ -771,24 +794,21 @@ export default function AdminPanel() {
                           <Users className="h-4 w-4 text-primary" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-foreground">{user.username}</p>
+                          <p className="text-sm font-medium text-foreground">{user.username || user.email}</p>
                           <p className="text-xs text-muted-foreground">
-                            Kayıt: {new Date(user.createdAt).toLocaleDateString("tr-TR")}
+                            {user.email}
                           </p>
                           <div className="flex items-center gap-2 mt-1">
                             <Badge variant="outline" className="text-xs">
                               <Smartphone className="h-3 w-3 mr-1" />
-                              {user.deviceCount || 0} Cihaz
+                              {user.devices?.length || 0} Cihaz
                             </Badge>
-                            <Badge variant="outline" className="text-xs">
-                              <Globe className="h-3 w-3 mr-1" />
-                              {user.uniqueIPs || 0} IP
-                            </Badge>
+                            {/* Aktif kullanıcı durumu API'den geliyorsa gösterilebilir */}
                           </div>
-                          {user.vipExpiryDate && (
+                          {user.vipExpiry && (
                             <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
                               <Calendar className="h-3 w-3" />
-                              VIP Bitiş: {new Date(user.vipExpiryDate).toLocaleDateString("tr-TR")}
+                              VIP Bitiş: {new Date(user.vipExpiry).toLocaleDateString("tr-TR")}
                             </p>
                           )}
                         </div>
@@ -797,7 +817,7 @@ export default function AdminPanel() {
                         <Badge
                           variant={user.role === "admin" ? "default" : user.role === "vip" ? "secondary" : "outline"}
                         >
-                          {user.role.toUpperCase()}
+                          {user.role?.toUpperCase() || "USER"}
                         </Badge>
                         <Button
                           variant="outline"
@@ -808,31 +828,30 @@ export default function AdminPanel() {
                           <Eye className="h-3 w-3 mr-1" />
                           Detay
                         </Button>
-                        {user.username !== "pandora" && (
-                          <>
-                            <Select
-                              value={user.role}
-                              onValueChange={(value) => handleUpdateRole(user.id, value, user.vipExpiryDate)}
-                            >
-                              <SelectTrigger className="w-20 md:w-24 h-8 bg-slate-800/50 border-slate-700 text-xs">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="bg-slate-900 border-slate-800">
-                                <SelectItem value="demo">Demo</SelectItem>
-                                <SelectItem value="vip">VIP</SelectItem>
-                                <SelectItem value="admin">Admin</SelectItem>
-                              </SelectContent>
-                            </Select>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleDeleteUser(user.id)}
-                              className="h-8 w-8 hover:bg-destructive/20"
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </>
-                        )}
+                        {/* Demo admin kullanıcısı silinemez/düzenlenemez kontrolü eklenebilir */}
+                        <>
+                          <Select
+                            value={user.role}
+                            onValueChange={(value) => handleUpdateRole(user.uid, value, user.vipExpiry)}
+                          >
+                            <SelectTrigger className="w-20 md:w-24 h-8 bg-slate-800/50 border-slate-700 text-xs">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-800">
+                              <SelectItem value="demo">Demo</SelectItem>
+                              <SelectItem value="vip">VIP</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => handleDeleteUser(user.uid)}
+                            className="h-8 w-8 hover:bg-destructive/20"
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </>
                       </div>
                     </div>
                   ))}

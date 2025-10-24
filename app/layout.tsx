@@ -3,7 +3,7 @@ import type { Metadata } from "next"
 import { Geist, Geist_Mono } from "next/font/google"
 import { FirebaseProvider } from "./FirebaseProvider"
 import "./globals.css"
-import { Toaster } from "@/components/ui/toaster"
+import { Toaster as SonnerToaster } from "@/components/ui/sonner" // sonner'ı import et
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -25,7 +25,7 @@ export default function RootLayout({
         <FirebaseProvider>
           {children}
         </FirebaseProvider>
-        <Toaster />
+        <SonnerToaster />
       </body>
     </html>
   )

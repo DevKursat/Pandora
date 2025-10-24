@@ -7,15 +7,15 @@ export async function GET(request: Request) {
   const type = searchParams.get("type")
 
   if (userId && type === "devices") {
-    const devices = getUserDevices(userId)
+    const devices = await getUserDevices(userId)
     return NextResponse.json(devices)
   }
 
   if (userId && type === "history") {
-    const history = getUserLoginHistory(userId)
+    const history = await getUserLoginHistory(userId)
     return NextResponse.json(history)
   }
 
-  const usersWithDevices = getAllUsersWithDevices()
+  const usersWithDevices = await getAllUsersWithDevices()
   return NextResponse.json(usersWithDevices)
 }

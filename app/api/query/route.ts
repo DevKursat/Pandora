@@ -30,20 +30,60 @@ async function getUserIdFromRequest(request: NextRequest): Promise<string | null
     return null;
 }
 
+// Firestore'dan kullanıcı verilerini (rol, sorgu limiti vb.) getiren fonksiyon
+async function getUserData(uid: string) {
+    const db = getFirestore();
+    const userRef = db.collection('users').doc(uid);
+    const userSnap = await userRef.get();
+    if (!userSnap.exists) {
+        return null;
+    }
+    return userSnap.data();
+}
+
 export async function POST(request: NextRequest) {
     const userId = await getUserIdFromRequest(request);
     let logData: any;
+
+    // Kullanıcı doğrulanmamışsa veya UID alınamadıysa erişimi engelle
+    if (!userId) {
+        return NextResponse.json({ error: "Yetkisiz erişim. Lütfen giriş yapın." }, { status: 401 });
+    }
 
     try {
         const body = await request.json();
         const { queryId, params, api } = body;
 
         logData = {
-            userId: userId || 'anonymous',
+            userId: userId,
             queryType: queryId,
             params: params,
             status: 'pending',
         };
+
+        // Kullanıcı verilerini Firestore'dan al
+        const userData = await getUserData(userId);
+
+        // Kullanıcı bulunamazsa veya rolü yoksa erişimi engelle
+        if (!userData || !userData.role) {
+            return NextResponse.json({ error: "Kullanıcı profili bulunamadı veya rolünüz atanmamış." }, { status: 403 });
+        }
+
+        // Bakım modu kontrolü (admin olmayanlar için)
+        const db = getFirestore();
+        const settingsSnap = await db.collection('settings').doc('site').get();
+        const settings = settingsSnap.data();
+        if (settings?.maintenanceMode && userData.role !== 'admin') {
+             return NextResponse.json({ error: "Sistem şu anda bakım modundadır. Lütfen daha sonra tekrar deneyin." }, { status: 503 });
+        }
+
+
+        // Admin rolü dışındakiler için sorgu limiti kontrolü
+        if (userData.role !== 'admin') {
+            if (userData.queryCount <= 0) {
+                return NextResponse.json({ error: "Sorgu limitiniz dolmuştur." }, { status: 429 });
+            }
+        }
 
         let url: string;
         // ... (Harici API URL oluşturma mantığı aynı kaldı)
@@ -80,6 +120,15 @@ export async function POST(request: NextRequest) {
         }
 
         logData.status = 'success';
+
+        // Admin olmayan kullanıcıların sorgu hakkını azalt
+        if (userData.role !== 'admin') {
+            const userRef = db.collection('users').doc(userId);
+            await userRef.update({
+                queryCount: admin.firestore.FieldValue.increment(-1)
+            });
+        }
+
         await logQuery(logData);
 
         const responseText = await response.text();

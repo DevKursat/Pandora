@@ -1,31 +1,9 @@
 import { type NextRequest, NextResponse } from "next/server";
+import { getFirestore, getFirebaseAuth } from "@/lib/firebase-admin";
 import * as admin from 'firebase-admin';
 
-let db: admin.firestore.Firestore;
-let auth: admin.auth.Auth;
-
-function initializeFirebaseAdmin() {
-    if (admin.apps.length) {
-        db = admin.firestore();
-        auth = admin.auth();
-        return;
-    }
-    try {
-        const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON!);
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount)
-        });
-        db = admin.firestore();
-        auth = admin.auth();
-    } catch (error) {
-        console.error('Firebase Admin initialization error in query API:', error);
-    }
-}
-
-initializeFirebaseAdmin();
-
 async function logQuery(logData: any) {
-    if (!db) return;
+    const db = getFirestore();
     try {
         await db.collection('queryLogs').add({
             ...logData,
@@ -37,7 +15,7 @@ async function logQuery(logData: any) {
 }
 
 async function getUserIdFromRequest(request: NextRequest): Promise<string | null> {
-    if (!auth) return null;
+    const auth = getFirebaseAuth();
     const authHeader = request.headers.get('Authorization');
     if (authHeader?.startsWith('Bearer ')) {
         const idToken = authHeader.split('Bearer ')[1];
@@ -68,7 +46,7 @@ export async function POST(request: NextRequest) {
         };
 
         let url: string;
-
+        // ... (Harici API URL oluşturma mantığı aynı kaldı)
         if (api === "hanedan") {
             const endpointMap: Record<string, string> = {
                 hanedan_ad_soyad: "adsoyad.php", hanedan_ad_soyad_pro: "adsoyadpro.php", hanedan_ad_il_ilce: "adililce.php",

@@ -6,17 +6,19 @@ export async function GET() {
     const users = await getAllUsers()
     return NextResponse.json(users)
   } catch (error) {
-    return NextResponse.json({ error: "Failed to fetch users" }, { status: 500 })
+    // @ts-ignore
+    return NextResponse.json({ error: error.message || "Failed to fetch users" }, { status: 500 })
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const { email, password, role, vipExpiry } = await request.json()
-    const user = await addUser(email, password, role, vipExpiry)
-    return NextResponse.json(user)
+    const userData = await request.json()
+    const newUser = await addUser(userData)
+    return NextResponse.json(newUser)
   } catch (error) {
-    return NextResponse.json({ error: "Failed to add user" }, { status: 500 })
+    // @ts-ignore
+    return NextResponse.json({ error: error.message || "Failed to add user" }, { status: 500 })
   }
 }
 
@@ -26,7 +28,8 @@ export async function PATCH(request: NextRequest) {
     const success = await updateUserRole(userId, role, vipExpiry)
     return NextResponse.json({ success })
   } catch (error) {
-    return NextResponse.json({ error: "Failed to update user" }, { status: 500 })
+    // @ts-ignore
+    return NextResponse.json({ error: error.message || "Failed to update user" }, { status: 500 })
   }
 }
 
@@ -40,6 +43,7 @@ export async function DELETE(request: NextRequest) {
     const success = await deleteUser(userId)
     return NextResponse.json({ success })
   } catch (error) {
-    return NextResponse.json({ error: "Failed to delete user" }, { status: 500 })
+    // @ts-ignore
+    return NextResponse.json({ error: error.message || "Failed to delete user" }, { status: 500 })
   }
 }

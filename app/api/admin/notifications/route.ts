@@ -1,15 +1,27 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebase-admin";
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, recipients } = await request.json()
+    const { message, recipients } = await request.json();
 
-    // In a real application, this would send notifications to users
-    // For now, we'll just log it
-    console.log(`[v0] Notification sent to ${recipients}: ${message}`)
+    if (!message || !recipients) {
+      return NextResponse.json({ error: "Message and recipients are required" }, { status: 400 });
+    }
 
-    return NextResponse.json({ success: true, message: "Notification sent successfully" })
+    // In a real application, you might want to send notifications to specific users.
+    // For now, we'll store the notification in a "notifications" collection.
+    const notification = {
+      message,
+      recipients,
+      createdAt: new Date().toISOString(),
+    };
+
+    await adminDb.collection("notifications").add(notification);
+
+    return NextResponse.json({ success: true, message: "Notification sent successfully" });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to send notification" }, { status: 500 })
+    console.error("Failed to send notification:", error);
+    return NextResponse.json({ error: "Failed to send notification" }, { status: 500 });
   }
 }

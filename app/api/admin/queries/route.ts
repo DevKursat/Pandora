@@ -1,23 +1,39 @@
-import { type NextRequest, NextResponse } from "next/server"
+import { type NextRequest, NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebase-admin";
 
-const disabledQueries = new Set<string>()
+const settingsRef = adminDb.collection("settings").doc("disabledQueries");
 
 export async function POST(request: NextRequest) {
   try {
-    const { queryType, enabled } = await request.json()
+    const { queryType, enabled } = await request.json();
+
+    const doc = await settingsRef.get();
+    const disabledQueries = doc.exists ? doc.data()?.queries || [] : [];
 
     if (enabled) {
-      disabledQueries.delete(queryType)
+      const newDisabledQueries = disabledQueries.filter((q: string) => q !== queryType);
+      await settingsRef.set({ queries: newDisabledQueries });
     } else {
-      disabledQueries.add(queryType)
+      if (!disabledQueries.includes(queryType)) {
+        disabledQueries.push(queryType);
+        await settingsRef.set({ queries: disabledQueries });
+      }
     }
 
-    return NextResponse.json({ success: true, queryType, enabled })
+    return NextResponse.json({ success: true, queryType, enabled });
   } catch (error) {
-    return NextResponse.json({ error: "Failed to toggle query" }, { status: 500 })
+    console.error("Failed to toggle query:", error);
+    return NextResponse.json({ error: "Failed to toggle query" }, { status: 500 });
   }
 }
 
 export async function GET() {
-  return NextResponse.json({ disabledQueries: Array.from(disabledQueries) })
+  try {
+    const doc = await settingsRef.get();
+    const disabledQueries = doc.exists ? doc.data()?.queries || [] : [];
+    return NextResponse.json({ disabledQueries });
+  } catch (error) {
+    console.error("Failed to get disabled queries:", error);
+    return NextResponse.json({ error: "Failed to get disabled queries" }, { status: 500 });
+  }
 }

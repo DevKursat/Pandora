@@ -11,10 +11,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Shield, AlertCircle, Lock } from "lucide-react"
 import { SplashScreen } from "@/components/splash-screen"
+import { auth } from "@/lib/firebase"
+import { signInWithEmailAndPassword } from "firebase/auth"
 
 export default function AdminLogin() {
   const [showSplash, setShowSplash] = useState(true)
-  const [username, setUsername] = useState("")
+  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
@@ -25,15 +27,24 @@ export default function AdminLogin() {
     setError("")
     setIsLoading(true)
 
-    await new Promise((resolve) => setTimeout(resolve, 500))
-
-    if (username === "pandora" && password === "192621") {
-      localStorage.setItem("adminAuth", "true")
-      router.push("/boss")
-    } else {
-      setError("Yetkisiz erişim! Yanlış kullanıcı adı veya şifre.")
+    try {
+      const userCredential = await signInWithEmailAndPassword(auth, email, password)
+      const tokenResult = await userCredential.user.getIdTokenResult();
+      if (tokenResult.claims.role !== 'admin') {
+        setError("Bu sayfaya erişim yetkiniz yok.");
+        auth.signOut();
+      } else {
+        router.push("/boss")
+      }
+    } catch (error: any) {
+      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        setError("E-posta veya şifre hatalı.")
+      } else {
+        setError("Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.")
+      }
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
 
   if (showSplash) {
@@ -60,15 +71,15 @@ export default function AdminLogin() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="username" className="text-sm font-medium">
-                Yönetici Kullanıcı Adı
+              <Label htmlFor="email" className="text-sm font-medium">
+                E-posta
               </Label>
               <Input
-                id="username"
-                type="text"
-                placeholder="Admin kullanıcı adı"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                id="email"
+                type="email"
+                placeholder="admin@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 required
                 disabled={isLoading}
                 className="bg-slate-800/50 border-slate-700 focus:border-primary h-11"
@@ -76,12 +87,12 @@ export default function AdminLogin() {
             </div>
             <div className="space-y-2">
               <Label htmlFor="password" className="text-sm font-medium">
-                Yönetici Şifresi
+                Şifre
               </Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Admin şifresi"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
@@ -96,7 +107,7 @@ export default function AdminLogin() {
               </Alert>
             )}
             <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={isLoading}>
-              {isLoading ? "Doğrulanıyor..." : "Yönetici Girişi"}
+              {isLoading ? "Doğrulanıyor..." : "Giriş Yap"}
             </Button>
             <div className="text-center pt-4 border-t border-slate-800">
               <p className="text-xs text-muted-foreground">Bu alan sadece yetkili yöneticiler içindir.</p>

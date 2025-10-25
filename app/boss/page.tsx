@@ -21,6 +21,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { SplashScreen } from "@/components/splash-screen"
+import { onAuthUserChanged, User } from "@/lib/auth"
+import { auth } from "@/lib/firebase"
 import {
   Shield,
   Users,
@@ -101,14 +103,22 @@ export default function AdminPanel() {
   const router = useRouter()
 
   useEffect(() => {
-    const adminAuth = localStorage.getItem("adminAuth")
-    if (adminAuth !== "true") {
-      router.push("/boss/login")
-    } else {
-      setIsAuthorized(true)
-      loadAdminData()
-    }
-  }, [router])
+    const unsubscribe = onAuthUserChanged(async (user) => {
+      if (!user) {
+        router.push("/boss/login");
+        return;
+      }
+      const tokenResult = await user.getIdTokenResult();
+      if (tokenResult.claims.role !== 'admin') {
+        router.push("/");
+        return;
+      }
+      setIsAuthorized(true);
+      loadAdminData();
+    });
+
+    return () => unsubscribe();
+  }, [router]);
 
   useEffect(() => {
     if (!isAuthorized) return
@@ -121,12 +131,20 @@ export default function AdminPanel() {
     return () => clearInterval(interval)
   }, [isAuthorized])
 
+  const getAuthHeader = async () => {
+    const user = auth.currentUser;
+    if (!user) return {};
+    const token = await user.getIdToken();
+    return { 'Authorization': `Bearer ${token}` };
+  }
+
   const loadAdminData = async () => {
     try {
+        const headers = await getAuthHeader();
       const [usersRes, logsRes, activeRes] = await Promise.all([
-        fetch("/api/admin/devices"), // Updated to fetch users with device info
-        fetch("/api/admin/logs"),
-        fetch("/api/admin/active"),
+        fetch("/api/admin/users", { headers }),
+        fetch("/api/admin/logs", { headers }),
+        fetch("/api/admin/active", { headers }),
       ])
 
       if (usersRes.ok) setUsers(await usersRes.json())
@@ -139,9 +157,10 @@ export default function AdminPanel() {
 
   const loadUserDevices = async (userId: string) => {
     try {
+        const headers = await getAuthHeader();
       const [devicesRes, historyRes] = await Promise.all([
-        fetch(`/api/admin/devices?userId=${userId}&type=devices`),
-        fetch(`/api/admin/devices?userId=${userId}&type=history`),
+        fetch(`/api/admin/devices?userId=${userId}&type=devices`, { headers }),
+        fetch(`/api/admin/devices?userId=${userId}&type=history`, { headers }),
       ])
 
       if (devicesRes.ok) setUserDevices(await devicesRes.json())
@@ -153,25 +172,26 @@ export default function AdminPanel() {
 
   const handleViewDevices = async (user: any) => {
     setSelectedUser(user)
-    await loadUserDevices(user.id)
+    await loadUserDevices(user.uid)
     setIsDeviceDialogOpen(true)
   }
 
   const handleAddUser = async () => {
-    if (!newUser.username || !newUser.password) {
-      alert("Kullanıcı adı ve şifre zorunludur!")
-      return
-    }
+    if (!newUser.email || !newUser.password) {
+        alert("E-posta ve şifre zorunludur!")
+        return
+      }
 
-    try {
-      const response = await fetch("/api/admin/users", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newUser),
-      })
+      try {
+        const headers = await getAuthHeader();
+        const response = await fetch("/api/admin/users", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...headers },
+          body: JSON.stringify(newUser),
+        })
 
-      if (response.ok) {
-        setIsAddUserOpen(false)
+        if (response.ok) {
+          setIsAddUserOpen(false)
         setNewUser({
           username: "",
           password: "",
@@ -198,20 +218,21 @@ export default function AdminPanel() {
           exportPermission: false,
           advancedFilters: false,
         })
-        loadAdminData()
-        alert("Kullanıcı başarıyla eklendi!")
+          loadAdminData()
+          alert("Kullanıcı başarıyla eklendi!")
+        }
+      } catch (error) {
+        console.error("Failed to add user:", error)
+        alert("Kullanıcı eklenirken hata oluştu!")
       }
-    } catch (error) {
-      console.error("Failed to add user:", error)
-      alert("Kullanıcı eklenirken hata oluştu!")
-    }
   }
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm("Bu kullanıcıyı silmek istediğinizden emin misiniz?")) return
 
     try {
-      const response = await fetch(`/api/admin/users?id=${userId}`, { method: "DELETE" })
+        const headers = await getAuthHeader();
+      const response = await fetch(`/api/admin/users?uid=${userId}`, { method: "DELETE", headers })
       if (response.ok) {
         loadAdminData()
         alert("Kullanıcı silindi!")
@@ -223,10 +244,11 @@ export default function AdminPanel() {
 
   const handleUpdateRole = async (userId: string, role: string, vipExpiry?: string) => {
     try {
+        const headers = await getAuthHeader();
       const response = await fetch("/api/admin/users", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, role, vipExpiry }),
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ uid: userId, role, vipExpiry }),
       })
 
       if (response.ok) loadAdminData()
@@ -242,9 +264,10 @@ export default function AdminPanel() {
     }
 
     try {
+        const headers = await getAuthHeader();
       const response = await fetch("/api/admin/notifications", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify(notification),
       })
 
@@ -259,9 +282,10 @@ export default function AdminPanel() {
 
   const handleMaintenanceToggle = async () => {
     try {
+        const headers = await getAuthHeader();
       const response = await fetch("/api/admin/maintenance", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({ enabled: !maintenanceMode }),
       })
 
@@ -278,9 +302,10 @@ export default function AdminPanel() {
 
   const handleQueryToggle = async (queryType: string, enabled: boolean) => {
     try {
+        const headers = await getAuthHeader();
       const response = await fetch("/api/admin/queries", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify({ queryType, enabled }),
       })
 
@@ -354,7 +379,7 @@ export default function AdminPanel() {
               <Button
                 variant="outline"
                 onClick={() => {
-                  localStorage.removeItem("adminAuth")
+                  auth.signOut();
                   router.push("/boss/login")
                 }}
                 className="hover:bg-slate-800 text-xs md:text-sm"
@@ -459,12 +484,12 @@ export default function AdminPanel() {
                         </h4>
                         <div className="grid md:grid-cols-2 gap-4">
                           <div>
-                            <Label>Kullanıcı Adı *</Label>
+                            <Label>E-posta *</Label>
                             <Input
-                              value={newUser.username}
-                              onChange={(e) => setNewUser({ ...newUser, username: e.target.value })}
+                              value={newUser.email}
+                              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
                               className="bg-slate-800/50 border-slate-700"
-                              placeholder="kullanici123"
+                              placeholder="ornek@email.com"
                             />
                           </div>
                           <div>
@@ -523,16 +548,6 @@ export default function AdminPanel() {
                           İletişim Bilgileri
                         </h4>
                         <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <Label>E-posta</Label>
-                            <Input
-                              type="email"
-                              value={newUser.email}
-                              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                              className="bg-slate-800/50 border-slate-700"
-                              placeholder="ornek@email.com"
-                            />
-                          </div>
                           <div>
                             <Label>Telefon</Label>
                             <Input
@@ -763,7 +778,7 @@ export default function AdminPanel() {
                 <div className="space-y-3">
                   {users.map((user) => (
                     <div
-                      key={user.id}
+                      key={user.uid}
                       className="flex items-center justify-between p-3 md:p-4 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-primary/50 transition-colors flex-wrap gap-3"
                     >
                       <div className="flex items-center gap-3 md:gap-4">
@@ -771,7 +786,7 @@ export default function AdminPanel() {
                           <Users className="h-4 w-4 text-primary" />
                         </div>
                         <div>
-                          <p className="text-sm font-medium text-foreground">{user.username}</p>
+                          <p className="text-sm font-medium text-foreground">{user.email}</p>
                           <p className="text-xs text-muted-foreground">
                             Kayıt: {new Date(user.createdAt).toLocaleDateString("tr-TR")}
                           </p>
@@ -808,11 +823,11 @@ export default function AdminPanel() {
                           <Eye className="h-3 w-3 mr-1" />
                           Detay
                         </Button>
-                        {user.username !== "pandora" && (
+                        {user.email !== "demo@example.com" && (
                           <>
                             <Select
                               value={user.role}
-                              onValueChange={(value) => handleUpdateRole(user.id, value, user.vipExpiryDate)}
+                              onValueChange={(value) => handleUpdateRole(user.uid, value, user.vipExpiryDate)}
                             >
                               <SelectTrigger className="w-20 md:w-24 h-8 bg-slate-800/50 border-slate-700 text-xs">
                                 <SelectValue />
@@ -826,7 +841,7 @@ export default function AdminPanel() {
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleDeleteUser(user.id)}
+                              onClick={() => handleDeleteUser(user.uid)}
                               className="h-8 w-8 hover:bg-destructive/20"
                             >
                               <Trash2 className="h-4 w-4 text-destructive" />
@@ -851,14 +866,14 @@ export default function AdminPanel() {
                 <div className="space-y-3">
                   {users.map((user) => (
                     <div
-                      key={user.id}
+                      key={user.uid}
                       className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-primary/50 transition-colors"
                     >
                       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                         <div className="flex items-center gap-3">
                           <Users className="h-5 w-5 text-primary" />
                           <div>
-                            <p className="text-sm font-medium text-foreground">{user.username}</p>
+                            <p className="text-sm font-medium text-foreground">{user.email}</p>
                             <Badge variant={user.role === "vip" ? "secondary" : "outline"} className="text-xs mt-1">
                               {user.role.toUpperCase()}
                             </Badge>
@@ -898,10 +913,10 @@ export default function AdminPanel() {
                           <div>
                             <p className="text-xs text-muted-foreground">Durum</p>
                             <Badge
-                              variant={activeUsers.includes(user.username) ? "default" : "outline"}
+                              variant={activeUsers.includes(user.email) ? "default" : "outline"}
                               className="text-xs"
                             >
-                              {activeUsers.includes(user.username) ? "Aktif" : "Çevrimdışı"}
+                              {activeUsers.includes(user.email) ? "Aktif" : "Çevrimdışı"}
                             </Badge>
                           </div>
                         </div>
@@ -921,32 +936,32 @@ export default function AdminPanel() {
               </div>
               <ScrollArea className="h-[400px] md:h-[500px]">
                 <div className="space-y-3">
-                  {queryLogs.map((log) => (
+                  {queryLogs.map((log, index) => (
                     <div
-                      key={log.id}
+                      key={index}
                       className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 border border-slate-700 flex-wrap gap-2"
                     >
                       <div className="flex items-center gap-3">
                         <Search className="h-4 w-4 text-muted-foreground" />
                         <div>
-                          <p className="text-sm font-medium text-foreground">{log.queryType}</p>
+                          <p className="text-sm font-medium text-foreground">{log.body?.queryId || 'N/A'}</p>
                           <p className="text-xs text-muted-foreground">
-                            {log.username} • {new Date(log.timestamp).toLocaleString("tr-TR")}
+                            {log.uid} • {new Date(log.timestamp).toLocaleString("tr-TR")}
                           </p>
                         </div>
                       </div>
                       <Badge
                         variant={
-                          log.status === "success" ? "default" : log.status === "denied" ? "secondary" : "destructive"
+                          log.step === "success" ? "default" : "destructive"
                         }
                         className="text-xs"
                       >
-                        {log.status === "success" ? (
+                        {log.step === "success" ? (
                           <CheckCircle className="h-3 w-3 mr-1" />
                         ) : (
                           <XCircle className="h-3 w-3 mr-1" />
                         )}
-                        {log.status}
+                        {log.step}
                       </Badge>
                     </div>
                   ))}
@@ -962,15 +977,15 @@ export default function AdminPanel() {
                 <h3 className="text-base md:text-lg font-semibold text-foreground">Aktif Kullanıcılar</h3>
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                {activeUsers.map((username) => (
-                  <Card key={username} className="p-4 bg-slate-800/50 border-slate-700">
+                {activeUsers.map((user: any) => (
+                  <Card key={user.uid} className="p-4 bg-slate-800/50 border-slate-700">
                     <div className="flex items-center gap-3">
                       <div className="relative">
                         <Users className="h-8 w-8 text-primary" />
                         <div className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-slate-900 animate-pulse" />
                       </div>
                       <div>
-                        <p className="text-sm font-medium text-foreground">{username}</p>
+                        <p className="text-sm font-medium text-foreground">{user.email}</p>
                         <p className="text-xs text-muted-foreground">Çevrimiçi</p>
                       </div>
                     </div>
@@ -1122,7 +1137,7 @@ export default function AdminPanel() {
           <DialogHeader>
             <DialogTitle className="text-xl flex items-center gap-2">
               <Smartphone className="h-5 w-5 text-primary" />
-              {selectedUser?.username} - Cihaz ve Giriş Detayları
+              {selectedUser?.email} - Cihaz ve Giriş Detayları
             </DialogTitle>
             <DialogDescription>Kullanıcının tüm cihazları ve giriş geçmişi</DialogDescription>
           </DialogHeader>

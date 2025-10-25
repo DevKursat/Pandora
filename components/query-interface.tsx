@@ -201,7 +201,7 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
   useEffect(() => {
     const checkUserRole = async () => {
       if (user) {
-        const tokenResult = await user.getIdTokenResult();
+        const tokenResult = await user.getIdTokenResult(true); // Force refresh
         const userRole = (tokenResult.claims.role as string) || "demo";
         setRole(userRole);
         setCanExecuteQuery(userRole === "admin" || userRole === "vip");

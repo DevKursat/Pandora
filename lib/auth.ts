@@ -5,11 +5,10 @@ import { onAuthStateChanged, User as FirebaseUser, signOut } from "firebase/auth
 
 export type UserRole = "demo" | "vip" | "admin";
 
-export interface User {
-  uid: string;
-  email: string | null;
-  role: UserRole; // Role might be stored elsewhere (e.g., Firestore) in a real app
+export interface User extends FirebaseUser {
+  role: UserRole;
 }
+
 
 /**
  * Listens for changes to the user's authentication state.
@@ -17,14 +16,29 @@ export interface User {
  * @returns An unsubscribe function.
  */
 export function onAuthUserChanged(callback: (user: User | null) => void) {
-  return onAuthStateChanged(auth, (firebaseUser: FirebaseUser | null) => {
+  return onAuthStateChanged(auth, async (firebaseUser: FirebaseUser | null) => {
     if (firebaseUser) {
-      // In a real app, you would fetch the user's role from your database (e.g., Firestore)
-      // For this example, we'll assign a default role.
+      const tokenResult = await firebaseUser.getIdTokenResult();
       const user: User = {
+        ...firebaseUser,
         uid: firebaseUser.uid,
         email: firebaseUser.email,
-        role: "vip", // Default role for any signed-in user
+        displayName: firebaseUser.displayName,
+        photoURL: firebaseUser.photoURL,
+        phoneNumber: firebaseUser.phoneNumber,
+        emailVerified: firebaseUser.emailVerified,
+        isAnonymous: firebaseUser.isAnonymous,
+        tenantId: firebaseUser.tenantId,
+        providerData: firebaseUser.providerData,
+        providerId: firebaseUser.providerId,
+        metadata: firebaseUser.metadata,
+        refreshToken: firebaseUser.refreshToken,
+        delete: firebaseUser.delete,
+        getIdToken: firebaseUser.getIdToken,
+        getIdTokenResult: firebaseUser.getIdTokenResult,
+        reload: firebaseUser.reload,
+        toJSON: firebaseUser.toJSON,
+        role: (tokenResult.claims.role as UserRole) || "demo",
       };
       callback(user);
     } else {

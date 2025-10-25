@@ -38,12 +38,12 @@ export default function ProfilePage() {
   const router = useRouter()
 
   useEffect(() => {
-    const unsubscribe = onAuthUserChanged((user) => {
+    const unsubscribe = onAuthUserChanged(async (user) => {
       if (!user) {
         router.push("/")
       } else {
         setUser(user)
-        loadUserStats(user)
+        await loadUserStats(user)
       }
       setIsChecking(false)
     })
@@ -57,19 +57,21 @@ export default function ProfilePage() {
   }, [])
 
 
-  const loadUserStats = (user: User) => {
-    // Mock data for stats, as the original logic was based on non-Firebase user data
-    const accountAge = Math.floor(Math.random() * 365) // Random days
-    const vipDaysRemaining = user.role === 'vip' || user.role === 'admin' ? Math.floor(Math.random() * 30) : 0
-
-    setStats({
-      totalQueries: Math.floor(Math.random() * 500) + 50,
-      successfulQueries: Math.floor(Math.random() * 450) + 40,
-      failedQueries: Math.floor(Math.random() * 50) + 10,
-      lastQuery: new Date(Date.now() - Math.random() * 86400000).toISOString(),
-      accountAge,
-      vipDaysRemaining,
-    })
+  const loadUserStats = async (user: User) => {
+    try {
+      const token = await user.getIdToken();
+      const response = await fetch('/api/user-profile', {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setStats(data);
+      }
+    } catch (error) {
+      console.error("Failed to load user stats:", error);
+    }
   }
 
   if (showSplash || isChecking) {

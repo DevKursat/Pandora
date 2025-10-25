@@ -234,17 +234,10 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
 
       if (!currentQuery) return
 
-      const token = await user?.getIdToken()
-      if (!token) {
-        setResult({ error: "Oturumunuzun süresi doldu, lütfen tekrar giriş yapın." })
-        return
-      }
-
       const response = await fetch("/api/query", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
           queryId: selectedQuery,

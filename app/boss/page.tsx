@@ -70,31 +70,23 @@ export default function AdminPanel() {
   const [isDeviceDialogOpen, setIsDeviceDialogOpen] = useState(false)
 
   const [newUser, setNewUser] = useState({
-    username: "",
+    email: "",
     password: "",
     role: "demo",
     vipExpiry: "",
-    email: "",
-    phone: "",
-    fullName: "",
+    name: "",
     address: "",
-    city: "",
-    country: "Türkiye",
-    postalCode: "",
     company: "",
-    department: "",
-    position: "",
-    notes: "",
-    maxQueries: "100",
-    queryRateLimit: "10",
-    ipWhitelist: "",
-    twoFactorEnabled: false,
-    emailNotifications: true,
-    smsNotifications: false,
-    apiAccess: false,
-    exportPermission: false,
-    advancedFilters: false,
-  })
+    queryLimit: "100",
+  });
+  const [permissions, setPermissions] = useState({
+    "Ad Soyad": true,
+    "TC Sorgu": true,
+    "GSM TC": false,
+    "Plaka Sorgu": false,
+    "Tapu Sorgu": false,
+    "SGK Sorgu": false,
+  });
 
   const [notification, setNotification] = useState({ message: "", recipients: "all" })
   const [maintenanceMode, setMaintenanceMode] = useState(false)
@@ -115,6 +107,7 @@ export default function AdminPanel() {
       }
       setIsAuthorized(true);
       loadAdminData();
+      fetchMaintenanceStatus();
     });
 
     return () => unsubscribe();
@@ -137,6 +130,19 @@ export default function AdminPanel() {
     const token = await user.getIdToken();
     return { 'Authorization': `Bearer ${token}` };
   }
+
+  const fetchMaintenanceStatus = async () => {
+    try {
+      // This endpoint is public and doesn't need auth
+      const response = await fetch("/api/admin/maintenance");
+      if (response.ok) {
+        const data = await response.json();
+        setMaintenanceMode(data.isEnabled);
+      }
+    } catch (error) {
+      console.error("Failed to fetch maintenance status:", error);
+    }
+  };
 
   const loadAdminData = async () => {
     try {
@@ -178,54 +184,41 @@ export default function AdminPanel() {
 
   const handleAddUser = async () => {
     if (!newUser.email || !newUser.password) {
-        alert("E-posta ve şifre zorunludur!")
-        return
-      }
+      alert("E-posta ve şifre zorunludur!");
+      return;
+    }
 
-      try {
-        const headers = await getAuthHeader();
-        const response = await fetch("/api/admin/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", ...headers },
-          body: JSON.stringify(newUser),
-        })
+    try {
+      const headers = await getAuthHeader();
+      const response = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ ...newUser, permissions }),
+      });
 
-        if (response.ok) {
-          setIsAddUserOpen(false)
+      if (response.ok) {
+        setIsAddUserOpen(false);
         setNewUser({
-          username: "",
+          email: "",
           password: "",
           role: "demo",
           vipExpiry: "",
-          email: "",
-          phone: "",
-          fullName: "",
+          name: "",
           address: "",
-          city: "",
-          country: "Türkiye",
-          postalCode: "",
           company: "",
-          department: "",
-          position: "",
-          notes: "",
-          maxQueries: "100",
-          queryRateLimit: "10",
-          ipWhitelist: "",
-          twoFactorEnabled: false,
-          emailNotifications: true,
-          smsNotifications: false,
-          apiAccess: false,
-          exportPermission: false,
-          advancedFilters: false,
-        })
-          loadAdminData()
-          alert("Kullanıcı başarıyla eklendi!")
-        }
-      } catch (error) {
-        console.error("Failed to add user:", error)
-        alert("Kullanıcı eklenirken hata oluştu!")
+          queryLimit: "100",
+        });
+        loadAdminData();
+        alert("Kullanıcı başarıyla eklendi!");
+      } else {
+        const errorData = await response.json();
+        alert(`Kullanıcı eklenemedi: ${errorData.error || "Bilinmeyen bir hata oluştu."}`);
       }
-  }
+    } catch (error) {
+      console.error("Failed to add user:", error);
+      alert("Kullanıcı eklenirken bir ağ hatası oluştu!");
+    }
+  };
 
   const handleDeleteUser = async (userId: string) => {
     if (!confirm("Bu kullanıcıyı silmek istediğinizden emin misiniz?")) return
@@ -468,187 +461,94 @@ export default function AdminPanel() {
                       Kullanıcı Ekle
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="bg-slate-900 border-slate-800 max-w-3xl max-h-[90vh] overflow-y-auto">
+                  <DialogContent className="bg-slate-900 border-slate-800 max-w-lg max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
                       <DialogTitle className="text-xl">Yeni Kullanıcı Ekle</DialogTitle>
                       <DialogDescription>
-                        Sisteme yeni bir kullanıcı ekleyin ve detaylı ayarları yapın
+                        Sisteme yeni bir kullanıcı ekleyin ve yetkilerini belirleyin.
                       </DialogDescription>
                     </DialogHeader>
-                    <div className="space-y-6">
-                      {/* Basic Information */}
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                          <Shield className="h-4 w-4" />
-                          Temel Bilgiler
-                        </h4>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <Label>E-posta *</Label>
-                            <Input
-                              value={newUser.email}
-                              onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                              className="bg-slate-800/50 border-slate-700"
-                              placeholder="ornek@email.com"
-                            />
-                          </div>
-                          <div>
-                            <Label>Tam Ad</Label>
-                            <Input
-                              value={newUser.fullName}
-                              onChange={(e) => setNewUser({ ...newUser, fullName: e.target.value })}
-                              className="bg-slate-800/50 border-slate-700"
-                              placeholder="Ahmet Yılmaz"
-                            />
-                          </div>
+                    <div className="space-y-4 py-4">
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Ad Soyad</Label>
+                          <Input
+                            value={newUser.name}
+                            onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
+                            className="bg-slate-800/50 border-slate-700"
+                            placeholder="John Doe"
+                          />
+                        </div>
+                        <div>
+                          <Label>Şirket</Label>
+                          <Input
+                            value={newUser.company}
+                            onChange={(e) => setNewUser({ ...newUser, company: e.target.value })}
+                            className="bg-slate-800/50 border-slate-700"
+                            placeholder="Acme Inc."
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <Label>Adres</Label>
+                        <Input
+                            value={newUser.address}
+                            onChange={(e) => setNewUser({ ...newUser, address: e.target.value })}
+                            className="bg-slate-800/50 border-slate-700"
+                            placeholder="123 Main St, Anytown"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>E-posta *</Label>
+                          <Input
+                            type="email"
+                            value={newUser.email}
+                            onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
+                            className="bg-slate-800/50 border-slate-700"
+                            placeholder="ornek@email.com"
+                          />
+                        </div>
+                        <div className="relative">
+                          <Label>Şifre *</Label>
                           <div className="relative">
-                            <Label>Şifre *</Label>
-                            <div className="relative">
-                              <Input
-                                type={showPassword ? "text" : "password"}
-                                value={newUser.password}
-                                onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
-                                className="bg-slate-800/50 border-slate-700 pr-10"
-                                placeholder="••••••••"
-                              />
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="icon"
-                                className="absolute right-0 top-0 h-full"
-                                onClick={() => setShowPassword(!showPassword)}
-                              >
-                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                              </Button>
-                            </div>
-                          </div>
-                          <div>
-                            <Label>Rol *</Label>
-                            <Select
-                              value={newUser.role}
-                              onValueChange={(value) => setNewUser({ ...newUser, role: value })}
+                            <Input
+                              type={showPassword ? "text" : "password"}
+                              value={newUser.password}
+                              onChange={(e) => setNewUser({ ...newUser, password: e.target.value })}
+                              className="bg-slate-800/50 border-slate-700 pr-10"
+                              placeholder="••••••••"
+                            />
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="absolute right-0 top-0 h-full"
+                              onClick={() => setShowPassword(!showPassword)}
                             >
-                              <SelectTrigger className="bg-slate-800/50 border-slate-700">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent className="bg-slate-900 border-slate-800">
-                                <SelectItem value="demo">Demo - Sadece Görüntüleme</SelectItem>
-                                <SelectItem value="vip">VIP - Tam Erişim</SelectItem>
-                                <SelectItem value="admin">Admin - Yönetici</SelectItem>
-                              </SelectContent>
-                            </Select>
+                              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                            </Button>
                           </div>
                         </div>
                       </div>
-
-                      {/* Contact Information */}
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                          <Mail className="h-4 w-4" />
-                          İletişim Bilgileri
-                        </h4>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <Label>Telefon</Label>
-                            <Input
-                              value={newUser.phone}
-                              onChange={(e) => setNewUser({ ...newUser, phone: e.target.value })}
-                              className="bg-slate-800/50 border-slate-700"
-                              placeholder="+90 555 123 4567"
-                            />
-                          </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Rol *</Label>
+                          <Select
+                            value={newUser.role}
+                            onValueChange={(value) => setNewUser({ ...newUser, role: value })}
+                          >
+                            <SelectTrigger className="bg-slate-800/50 border-slate-700">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-slate-900 border-slate-800">
+                              <SelectItem value="demo">Demo</SelectItem>
+                              <SelectItem value="vip">VIP</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
                         </div>
-                      </div>
-
-                      {/* Location Information */}
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                          <MapPin className="h-4 w-4" />
-                          Konum Bilgileri
-                        </h4>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div className="md:col-span-2">
-                            <Label>Adres</Label>
-                            <Input
-                              value={newUser.address}
-                              onChange={(e) => setNewUser({ ...newUser, address: e.target.value })}
-                              className="bg-slate-800/50 border-slate-700"
-                              placeholder="Sokak, Mahalle, No"
-                            />
-                          </div>
-                          <div>
-                            <Label>Şehir</Label>
-                            <Input
-                              value={newUser.city}
-                              onChange={(e) => setNewUser({ ...newUser, city: e.target.value })}
-                              className="bg-slate-800/50 border-slate-700"
-                              placeholder="İstanbul"
-                            />
-                          </div>
-                          <div>
-                            <Label>Ülke</Label>
-                            <Input
-                              value={newUser.country}
-                              onChange={(e) => setNewUser({ ...newUser, country: e.target.value })}
-                              className="bg-slate-800/50 border-slate-700"
-                            />
-                          </div>
-                          <div>
-                            <Label>Posta Kodu</Label>
-                            <Input
-                              value={newUser.postalCode}
-                              onChange={(e) => setNewUser({ ...newUser, postalCode: e.target.value })}
-                              className="bg-slate-800/50 border-slate-700"
-                              placeholder="34000"
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Organization Information */}
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                          <CreditCard className="h-4 w-4" />
-                          Organizasyon Bilgileri
-                        </h4>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <Label>Şirket</Label>
-                            <Input
-                              value={newUser.company}
-                              onChange={(e) => setNewUser({ ...newUser, company: e.target.value })}
-                              className="bg-slate-800/50 border-slate-700"
-                              placeholder="Şirket Adı"
-                            />
-                          </div>
-                          <div>
-                            <Label>Departman</Label>
-                            <Input
-                              value={newUser.department}
-                              onChange={(e) => setNewUser({ ...newUser, department: e.target.value })}
-                              className="bg-slate-800/50 border-slate-700"
-                              placeholder="IT, Güvenlik, vb."
-                            />
-                          </div>
-                          <div className="md:col-span-2">
-                            <Label>Pozisyon</Label>
-                            <Input
-                              value={newUser.position}
-                              onChange={(e) => setNewUser({ ...newUser, position: e.target.value })}
-                              className="bg-slate-800/50 border-slate-700"
-                              placeholder="Güvenlik Uzmanı, Analist, vb."
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* VIP Settings */}
-                      {newUser.role === "vip" && (
-                        <div className="space-y-4">
-                          <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                            <Calendar className="h-4 w-4" />
-                            VIP Ayarları
-                          </h4>
+                        {newUser.role === "vip" && (
                           <div>
                             <Label>VIP Bitiş Tarihi</Label>
                             <Input
@@ -658,118 +558,45 @@ export default function AdminPanel() {
                               className="bg-slate-800/50 border-slate-700"
                             />
                           </div>
-                        </div>
-                      )}
-
-                      {/* Query Limits */}
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                          <Database className="h-4 w-4" />
-                          Sorgu Limitleri
-                        </h4>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div>
-                            <Label>Maksimum Sorgu (Günlük)</Label>
+                        )}
+                      </div>
+                       <div>
+                            <Label>Sorgu Limiti</Label>
                             <Input
                               type="number"
-                              value={newUser.maxQueries}
-                              onChange={(e) => setNewUser({ ...newUser, maxQueries: e.target.value })}
+                              value={newUser.queryLimit}
+                              onChange={(e) => setNewUser({ ...newUser, queryLimit: e.target.value })}
                               className="bg-slate-800/50 border-slate-700"
+                              placeholder="100"
                             />
-                          </div>
-                          <div>
-                            <Label>Sorgu Hız Limiti (Dakika)</Label>
-                            <Input
-                              type="number"
-                              value={newUser.queryRateLimit}
-                              onChange={(e) => setNewUser({ ...newUser, queryRateLimit: e.target.value })}
-                              className="bg-slate-800/50 border-slate-700"
-                            />
-                          </div>
-                          <div className="md:col-span-2">
-                            <Label>IP Beyaz Liste (virgülle ayırın)</Label>
-                            <Input
-                              value={newUser.ipWhitelist}
-                              onChange={(e) => setNewUser({ ...newUser, ipWhitelist: e.target.value })}
-                              className="bg-slate-800/50 border-slate-700"
-                              placeholder="192.168.1.1, 10.0.0.1"
-                            />
-                          </div>
+                        </div>
+
+                      <div>
+                        <Label className="mb-2 block">Sorgu İzinleri</Label>
+                        <div className="grid grid-cols-2 gap-2">
+                          {Object.keys(permissions).map((key) => (
+                            <div key={key} className="flex items-center gap-2">
+                              <Switch
+                                id={key}
+                                checked={permissions[key as keyof typeof permissions]}
+                                onCheckedChange={(checked) =>
+                                  setPermissions({ ...permissions, [key]: checked })
+                                }
+                              />
+                              <Label htmlFor={key} className="text-sm font-normal">{key}</Label>
+                            </div>
+                          ))}
                         </div>
                       </div>
-
-                      {/* Permissions */}
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-primary flex items-center gap-2">
-                          <Lock className="h-4 w-4" />
-                          İzinler ve Özellikler
-                        </h4>
-                        <div className="grid md:grid-cols-2 gap-4">
-                          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30 border border-slate-700">
-                            <Label className="cursor-pointer">İki Faktörlü Doğrulama</Label>
-                            <Switch
-                              checked={newUser.twoFactorEnabled}
-                              onCheckedChange={(checked) => setNewUser({ ...newUser, twoFactorEnabled: checked })}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30 border border-slate-700">
-                            <Label className="cursor-pointer">E-posta Bildirimleri</Label>
-                            <Switch
-                              checked={newUser.emailNotifications}
-                              onCheckedChange={(checked) => setNewUser({ ...newUser, emailNotifications: checked })}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30 border border-slate-700">
-                            <Label className="cursor-pointer">SMS Bildirimleri</Label>
-                            <Switch
-                              checked={newUser.smsNotifications}
-                              onCheckedChange={(checked) => setNewUser({ ...newUser, smsNotifications: checked })}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30 border border-slate-700">
-                            <Label className="cursor-pointer">API Erişimi</Label>
-                            <Switch
-                              checked={newUser.apiAccess}
-                              onCheckedChange={(checked) => setNewUser({ ...newUser, apiAccess: checked })}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30 border border-slate-700">
-                            <Label className="cursor-pointer">Dışa Aktarma İzni</Label>
-                            <Switch
-                              checked={newUser.exportPermission}
-                              onCheckedChange={(checked) => setNewUser({ ...newUser, exportPermission: checked })}
-                            />
-                          </div>
-                          <div className="flex items-center justify-between p-3 rounded-lg bg-slate-800/30 border border-slate-700">
-                            <Label className="cursor-pointer">Gelişmiş Filtreler</Label>
-                            <Switch
-                              checked={newUser.advancedFilters}
-                              onCheckedChange={(checked) => setNewUser({ ...newUser, advancedFilters: checked })}
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Notes */}
-                      <div className="space-y-4">
-                        <h4 className="text-sm font-semibold text-primary">Notlar</h4>
-                        <Textarea
-                          value={newUser.notes}
-                          onChange={(e) => setNewUser({ ...newUser, notes: e.target.value })}
-                          className="bg-slate-800/50 border-slate-700 min-h-[100px]"
-                          placeholder="Kullanıcı hakkında notlar..."
-                        />
-                      </div>
-
-                      <div className="flex gap-2">
-                        <Button onClick={handleAddUser} className="flex-1 bg-primary hover:bg-primary/90">
-                          <UserPlus className="mr-2 h-4 w-4" />
-                          Kullanıcı Ekle
-                        </Button>
-                        <Button variant="outline" onClick={() => setIsAddUserOpen(false)} className="flex-1">
-                          İptal
-                        </Button>
-                      </div>
+                    </div>
+                    <div className="flex gap-2 pt-4 border-t border-slate-800">
+                      <Button onClick={handleAddUser} className="flex-1 bg-primary hover:bg-primary/90">
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Kullanıcıyı Onayla ve Ekle
+                      </Button>
+                      <Button variant="outline" onClick={() => setIsAddUserOpen(false)} className="flex-1">
+                        İptal
+                      </Button>
                     </div>
                   </DialogContent>
                 </Dialog>
@@ -936,7 +763,7 @@ export default function AdminPanel() {
               </div>
               <ScrollArea className="h-[400px] md:h-[500px]">
                 <div className="space-y-3">
-                  {queryLogs.map((log, index) => (
+                  {Array.isArray(queryLogs) && queryLogs.map((log, index) => (
                     <div
                       key={index}
                       className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 border border-slate-700 flex-wrap gap-2"

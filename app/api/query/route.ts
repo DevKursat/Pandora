@@ -1,15 +1,17 @@
-import { type NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { type NextRequest, NextResponse } from "next/server"
+import fs from "fs/promises"
+import path from "path"
 
-// Function to write query logs to Firestore
+// Helper function to write logs
 async function writeToLog(logData: any) {
+  const logFilePath = path.join(process.cwd(), "query_debug.log")
+  const timestamp = new Date().toISOString()
+  const logContent = `[${timestamp}] ${JSON.stringify(logData, null, 2)}\n\n`
+
   try {
-    await adminDb.collection("queryLogs").add({
-      ...logData,
-      timestamp: new Date().toISOString(),
-    });
+    await fs.appendFile(logFilePath, logContent)
   } catch (error) {
-    console.error("Failed to write to log file:", error);
+    console.error("Failed to write to log file:", error)
   }
 }
 
@@ -21,55 +23,15 @@ export async function POST(request: NextRequest) {
       method: request.method,
       url: request.url,
     },
-  };
+  }
 
   try {
-    // 1. Authenticate the user
-    const authorization = request.headers.get("Authorization");
-    if (!authorization?.startsWith("Bearer ")) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
-    const idToken = authorization.split("Bearer ")[1];
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
-    const uid = decodedToken.uid;
-    logData.uid = uid;
+    const body = await request.json()
+    logData.body = body
+    const { queryId, params, api } = body
 
-    // 2. Get user data and permissions from Firestore
-    const userDocRef = adminDb.collection("users").doc(uid);
-    const userDoc = await userDocRef.get();
-    if (!userDoc.exists) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
-    const userData = userDoc.data();
-    const userRole = userData?.role || "user";
+    let url: string
 
-    // 3. Check against disabled queries
-    const settingsDoc = await adminDb.collection("settings").doc("disabledQueries").get();
-    const disabledQueries = settingsDoc.exists ? settingsDoc.data()?.queries || [] : [];
-
-    const body = await request.json();
-    const { queryId, params, api } = body;
-    logData.body = body;
-
-    if (disabledQueries.includes(queryId)) {
-        return NextResponse.json({ error: "Bu sorgu tipi geçici olarak devre dışı bırakılmıştır." }, { status: 403 });
-    }
-
-    // 4. Enforce query limits based on role
-    const queryLimits: Record<string, number> = {
-        user: 50,
-        vip: 500,
-        admin: Infinity
-    };
-    const queryLimit = queryLimits[userRole] || 50;
-    const queryCount = userData?.queryCount || 0;
-
-    if (queryCount >= queryLimit) {
-        return NextResponse.json({ error: "Sorgu limitinizi aştınız. Daha fazla sorgu için lütfen yetkinizi yükseltin." }, { status: 429 });
-    }
-
-    // 5. Make the external API call
-    let url: string;
     if (api === "hanedan") {
       const endpointMap: Record<string, string> = {
         hanedan_ad_soyad: "adsoyad.php",
@@ -123,41 +85,51 @@ export async function POST(request: NextRequest) {
       })
       url = `https://x.sorgu-api.rf.gd/pandora/${queryId}?${queryParams}`
     }
-    logData.external_url = url;
 
-    const response = await fetch(url, { method: "GET", headers: { "User-Agent": "Mozilla/5.0" } });
-    const responseText = await response.text();
+    logData.step = "url_created"
+    logData.external_url = url
+
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "User-Agent": "Mozilla/5.0",
+      },
+    })
+
+    logData.step = "api_response_received"
+    logData.response = {
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers),
+    }
+
+    const responseText = await response.text()
+    logData.response_body = responseText
 
     if (!response.ok) {
-        logData.step = "api_error";
-        logData.response_body = responseText;
-        await writeToLog(logData);
-        return NextResponse.json({ error: "API isteği başarısız oldu" }, { status: response.status });
+      await writeToLog(logData)
+      return NextResponse.json({ error: "API isteği başarısız oldu" }, { status: response.status })
     }
-
-    // 6. Increment query count and log on success
-    if (userRole !== 'admin') {
-        await userDocRef.update({ queryCount: queryCount + 1 });
-    }
-
-    logData.step = "success";
-    logData.response_body = responseText;
-    await writeToLog(logData);
 
     try {
-      const data = JSON.parse(responseText);
-      return NextResponse.json(data);
+      const data = JSON.parse(responseText)
+      logData.step = "success"
+      await writeToLog(logData)
+      return NextResponse.json(data)
     } catch (e) {
-      return NextResponse.json({ result: responseText });
+      logData.step = "json_parse_error"
+      await writeToLog(logData)
+      // Return the raw text if it's not JSON
+      return NextResponse.json({ result: responseText })
     }
-
   } catch (error: any) {
-    logData.step = "internal_error";
-    if (error.code === 'auth/id-token-expired') {
-        return NextResponse.json({ error: " oturumun süresi doldu, lütfen tekrar giriş yapın." }, { status: 401 });
+    console.error("Error in /api/query:", error);
+    logData.step = "internal_error"
+    logData.error = {
+      message: error.message,
+      stack: error.stack,
     }
-    logData.error = { message: error.message, stack: error.stack };
-    await writeToLog(logData);
-    return NextResponse.json({ error: "Sorgu sırasında bir hata oluştu" }, { status: 500 });
+    await writeToLog(logData)
+    return NextResponse.json({ error: "Sorgu sırasında bir hata oluştu" }, { status: 500 })
   }
 }

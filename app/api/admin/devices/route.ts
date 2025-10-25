@@ -1,33 +1,54 @@
 import { type NextRequest, NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { DecodedIdToken } from "firebase-admin/auth";
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = new URL(request.url);
-  const userId = searchParams.get("userId");
-
-  try {
-    if (userId) {
-      // Fetch devices for a specific user
-      const devicesSnapshot = await adminDb.collection("users").doc(userId).collection("devices").get();
-      const devices = devicesSnapshot.docs.map(doc => doc.data());
-      return NextResponse.json(devices);
-    } else {
-      // Fetch all users and their devices
-      const usersSnapshot = await adminDb.collection("users").get();
-      const usersWithDevices = await Promise.all(
-        usersSnapshot.docs.map(async (userDoc) => {
-          const devicesSnapshot = await userDoc.ref.collection("devices").get();
-          return {
-            uid: userDoc.id,
-            email: userDoc.data().email,
-            devices: devicesSnapshot.docs.map(doc => doc.data()),
-          };
-        })
-      );
-      return NextResponse.json(usersWithDevices);
-    }
-  } catch (error) {
-    console.error("Failed to fetch devices:", error);
-    return NextResponse.json({ error: "Failed to fetch devices" }, { status: 500 });
+// Middleware to verify the token and check for admin role
+async function withAdminAuth(
+  request: NextRequest,
+  handler: (decodedToken: DecodedIdToken) => Promise<NextResponse>
+) {
+  const authorization = request.headers.get("Authorization");
+  if (!authorization?.startsWith("Bearer ")) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const idToken = authorization.split("Bearer ")[1];
+  try {
+    const decodedToken = await adminAuth.verifyIdToken(idToken);
+    if (decodedToken.role !== 'admin') {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    return await handler(decodedToken);
+  } catch (error) {
+    return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+  }
+}
+
+// GET user devices or login history
+export async function GET(request: NextRequest) {
+  return withAdminAuth(request, async () => {
+    const { searchParams } = new URL(request.url);
+    const userId = searchParams.get("userId");
+    const type = searchParams.get("type"); // 'devices' or 'history'
+
+    if (!userId) {
+      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
+    }
+
+    try {
+      if (type === 'devices') {
+        const devicesSnapshot = await adminDb.collection('devices').where('userId', '==', userId).get();
+        const devices = devicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return NextResponse.json(devices);
+      } else if (type === 'history') {
+        const historySnapshot = await adminDb.collection('loginHistory').where('userId', '==', userId).orderBy('timestamp', 'desc').limit(50).get();
+        const history = historySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        return NextResponse.json(history);
+      } else {
+        return NextResponse.json({ error: "Invalid type specified" }, { status: 400 });
+      }
+    } catch (error) {
+      console.error(`Error fetching user ${type}:`, error);
+      return NextResponse.json({ error: `Failed to fetch user ${type}` }, { status: 500 });
+    }
+  });
 }

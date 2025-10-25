@@ -21,6 +21,8 @@ import {
   TrendingUp,
   Database,
   CheckCircle2,
+  Search,
+  XCircle,
 } from "lucide-react"
 
 export default function ProfilePage() {
@@ -35,6 +37,7 @@ export default function ProfilePage() {
     accountAge: 0,
     vipDaysRemaining: null as number | null,
   })
+  const [activity, setActivity] = useState<any[]>([])
   const router = useRouter()
 
   useEffect(() => {
@@ -43,7 +46,7 @@ export default function ProfilePage() {
         router.push("/")
       } else {
         setUser(user)
-        await loadUserStats(user)
+        await loadUserData(user)
       }
       setIsChecking(false)
     })
@@ -57,20 +60,32 @@ export default function ProfilePage() {
   }, [])
 
 
-  const loadUserStats = async (user: User) => {
+  const loadUserData = async (user: User) => {
     try {
       const token = await user.getIdToken();
-      const response = await fetch('/api/user-profile', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-      if (response.ok) {
-        const data = await response.json();
+      const [statsResponse, activityResponse] = await Promise.all([
+        fetch('/api/user-profile', {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        }),
+        fetch('/api/user-activity', {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+      ]);
+
+      if (statsResponse.ok) {
+        const data = await statsResponse.json();
         setStats(data);
       }
+      if (activityResponse.ok) {
+        const data = await activityResponse.json();
+        setActivity(data);
+      }
     } catch (error) {
-      console.error("Failed to load user stats:", error);
+      console.error("Failed to load user data:", error);
     }
   }
 
@@ -220,24 +235,27 @@ export default function ProfilePage() {
                 <span className="text-sm md:text-base">Son Aktiviteler</span>
               </h3>
               <div className="space-y-3">
-                {stats.lastQuery && (
-                  <div className="p-3 md:p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+                {activity.map((log, index) => (
+                  <div key={index} className="p-3 md:p-4 rounded-lg bg-slate-800/50 border border-slate-700">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div>
-                        <p className="text-xs md:text-sm font-medium text-foreground">Son Sorgu</p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {new Date(stats.lastQuery).toLocaleString("tr-TR")}
-                        </p>
+                      <div className="flex items-center gap-3">
+                        {log.step === "success" ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
+                        <div>
+                          <p className="text-xs md:text-sm font-medium text-foreground">{log.body?.queryId || 'N/A'}</p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {new Date(log.timestamp).toLocaleString("tr-TR")}
+                          </p>
+                        </div>
                       </div>
-                      <Badge variant="secondary" className="text-xs w-fit">
-                        Başarılı
+                      <Badge variant={log.step === "success" ? "default" : "destructive"} className="text-xs w-fit">
+                        {log.step}
                       </Badge>
                     </div>
                   </div>
+                ))}
+                {activity.length === 0 && (
+                    <p className="text-xs md:text-sm text-muted-foreground text-center">Aktivite geçmişi bulunamadı.</p>
                 )}
-                <div className="p-3 md:p-4 rounded-lg bg-slate-800/50 border border-slate-700">
-                  <p className="text-xs md:text-sm text-muted-foreground">Aktivite geçmişi yakında eklenecek...</p>
-                </div>
               </div>
             </Card>
           </TabsContent>

@@ -16,28 +16,29 @@ import { Shield, ArrowLeft, SettingsIcon, Bell, Eye, Database } from "lucide-rea
 
 const SETTINGS_KEY = "pandora_user_settings"
 
-const defaultSettings = {
-  notifications: true, emailAlerts: false, queryHistory: true, autoSave: true,
-  darkMode: true, language: "tr", resultsPerPage: "20", cacheResults: true,
-  twoFactorAuth: false, sessionTimeout: "30",
-};
-
 export default function SettingsPage() {
   const [showSplash, setShowSplash] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [isChecking, setIsChecking] = useState(true)
   const { toast } = useToast()
 
-  const [settings, setSettings] = useState(defaultSettings);
+  const [settings, setSettings] = useState(() => {
+    if (typeof window === 'undefined') {
+      return {
+        notifications: true, emailAlerts: false, queryHistory: true, autoSave: true,
+        darkMode: true, language: "tr", resultsPerPage: "20", cacheResults: true,
+        twoFactorAuth: false, sessionTimeout: "30",
+      };
+    }
+    const savedSettings = localStorage.getItem(SETTINGS_KEY);
+    return savedSettings ? JSON.parse(savedSettings) : {
+      notifications: true, emailAlerts: false, queryHistory: true, autoSave: true,
+      darkMode: true, language: "tr", resultsPerPage: "20", cacheResults: true,
+      twoFactorAuth: false, sessionTimeout: "30",
+    };
+  });
 
   const router = useRouter()
-
-  useEffect(() => {
-    const savedSettings = localStorage.getItem(SETTINGS_KEY);
-    if (savedSettings) {
-      setSettings(JSON.parse(savedSettings));
-    }
-  }, []);
 
   useEffect(() => {
     const unsubscribe = onAuthUserChanged((user) => {
@@ -67,6 +68,7 @@ export default function SettingsPage() {
       description: "Yaptığınız değişiklikler başarıyla kaydedildi.",
     })
 
+    // Apply dark mode immediately
     if (settings.darkMode) {
       document.documentElement.classList.add('dark');
     } else {
@@ -75,6 +77,7 @@ export default function SettingsPage() {
   }
 
   useEffect(() => {
+    // Apply dark mode on initial load
     if (settings.darkMode) {
       document.documentElement.classList.add('dark');
     } else {

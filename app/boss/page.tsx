@@ -1,6 +1,5 @@
 "use client"
 
-import { Label } from "@/components/ui/label"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { auth } from "@/lib/firebase" // Sadece çıkış için

@@ -23,12 +23,17 @@ async function withAdminAuth(
   }
 }
 
-// GET active users
+// GET active users (seen in the last 5 minutes)
 export async function GET(request: NextRequest) {
   return withAdminAuth(request, async () => {
     try {
-      const activeUsersSnapshot = await adminDb.collection('activeUsers').get();
-      const activeUsers = activeUsersSnapshot.docs.map(doc => doc.data());
+      const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+
+      const activeUsersSnapshot = await adminDb.collection('activeUsers')
+        .where('lastSeen', '>=', fiveMinutesAgo)
+        .get();
+
+      const activeUsers = activeUsersSnapshot.docs.map(doc => ({ uid: doc.id, ...doc.data() }));
       return NextResponse.json(activeUsers);
     } catch (error) {
       console.error("Error fetching active users:", error);

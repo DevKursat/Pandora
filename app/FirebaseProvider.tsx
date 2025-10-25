@@ -1,31 +1,38 @@
-"use client";
+"use client"
 
-import React, { createContext, useContext, ReactNode } from "react";
-import { app, auth, analytics } from "@/lib/firebase";
-import { FirebaseApp } from "firebase/app";
-import { Auth } from "firebase/auth";
-import { Analytics } from "firebase/analytics";
+import { useEffect } from 'react';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
-interface FirebaseContextType {
-  app: FirebaseApp;
-  auth: Auth;
-  analytics: Analytics | null;
+// Helper function to set a cookie
+function setCookie(name: string, value: string, days: number) {
+    let expires = "";
+    if (days) {
+        const date = new Date();
+        date.setTime(date.getTime() + (days*24*60*60*1000));
+        expires = "; expires=" + date.toUTCString();
+    }
+    document.cookie = name + "=" + (value || "")  + expires + "; path=/";
 }
 
-const FirebaseContext = createContext<FirebaseContextType | undefined>(undefined);
+// Helper function to erase a cookie
+function eraseCookie(name: string) {
+    document.cookie = name+'=; Path=/; Expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+}
 
-export const FirebaseProvider = ({ children }: { children: ReactNode }) => {
-  return (
-    <FirebaseContext.Provider value={{ app, auth, analytics }}>
-      {children}
-    </FirebaseContext.Provider>
-  );
-};
+export default function FirebaseProvider({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        const token = await user.getIdToken();
+        setCookie('firebaseIdToken', token, 7); // Set cookie for 7 days
+      } else {
+        eraseCookie('firebaseIdToken');
+      }
+    });
 
-export const useFirebase = () => {
-  const context = useContext(FirebaseContext);
-  if (context === undefined) {
-    throw new Error("useFirebase must be used within a FirebaseProvider");
-  }
-  return context;
-};
+    return () => unsubscribe();
+  }, []);
+
+  return <>{children}</>;
+}

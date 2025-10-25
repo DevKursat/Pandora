@@ -210,6 +210,30 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
     checkUserRole();
   }, [user]);
 
+  // Heartbeat effect to keep the user session active
+  useEffect(() => {
+    if (!user) return;
+
+    const sendHeartbeat = async () => {
+      try {
+        const token = await user.getIdToken();
+        await fetch('/api/heartbeat', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+          },
+        });
+      } catch (error) {
+        console.error('Failed to send heartbeat:', error);
+      }
+    };
+
+    sendHeartbeat(); // Send once on mount
+    const interval = setInterval(sendHeartbeat, 60 * 1000); // Send every 60 seconds
+
+    return () => clearInterval(interval);
+  }, [user]);
+
   const handleLogout = () => {
     setShowSplash(true)
     setTimeout(() => {

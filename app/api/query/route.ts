@@ -70,8 +70,11 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    if (userData?.permissions && !userData.permissions[queryId]) {
-      return NextResponse.json({ error: "Bu sorguyu yapma yetkiniz yok." }, { status: 403 });
+    // 3.5. Check permissions ONLY for non-admin/non-vip users
+    if (userRole !== "admin" && userRole !== "vip") {
+      if (userData?.permissions && !userData.permissions[queryId]) {
+        return NextResponse.json({ error: "Bu sorguyu yapma yetkiniz yok." }, { status: 403 });
+      }
     }
 
     // 4. Proceed with the external API call

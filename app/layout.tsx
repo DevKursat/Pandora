@@ -65,11 +65,11 @@ export default async function RootLayout({
 
   if (isMaintenance && !isAdmin) {
     return (
-        <html lang="tr" className="dark" suppressHydrationWarning>
-            <body className={`font-sans antialiased`}>
-                <MaintenancePage />
-            </body>
-        </html>
+      <html lang="tr" className="dark" suppressHydrationWarning>
+        <body className={`font-sans antialiased`}>
+          <MaintenancePage />
+        </body>
+      </html>
     );
   }
 

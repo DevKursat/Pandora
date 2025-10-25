@@ -26,9 +26,9 @@ import {
 } from "lucide-react"
 
 export default function ProfilePage() {
-  const [showSplash, setShowSplash] = useState(true)
-  const [user, setUser] = useState<User | null>(null)
-  const [isChecking, setIsChecking] = useState(true)
+  const [showSplash, setShowSplash] = useState(true);
+  const [user, setUser] = useState<User | null>(null);
+  const [isChecking, setIsChecking] = useState(true);
   const [stats, setStats] = useState({
     totalQueries: 0,
     successfulQueries: 0,
@@ -36,22 +36,28 @@ export default function ProfilePage() {
     lastQuery: null as string | null,
     accountAge: 0,
     vipDaysRemaining: null as number | null,
-  })
-  const [activity, setActivity] = useState<any[]>([])
-  const router = useRouter()
+  });
+  const [activity, setActivity] = useState<any[]>([]);
+  const [isVip, setIsVip] = useState(false);
+  const [role, setRole] = useState("demo");
+  const router = useRouter();
 
   useEffect(() => {
     const unsubscribe = onAuthUserChanged(async (user) => {
       if (!user) {
-        router.push("/")
+        router.push("/");
       } else {
-        setUser(user)
-        await loadUserData(user)
+        setUser(user);
+        const tokenResult = await user.getIdTokenResult();
+        const userRole = (tokenResult.claims.role as string) || "demo";
+        setRole(userRole);
+        setIsVip(userRole === "admin" || userRole === "vip");
+        await loadUserData(user);
       }
-      setIsChecking(false)
-    })
-    return () => unsubscribe()
-  }, [router])
+      setIsChecking(false);
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   useEffect(() => {
     // Hide splash screen after a delay
@@ -95,8 +101,6 @@ export default function ProfilePage() {
 
   if (!user) return null
 
-  const isVip = isVipOrAdmin(user)
-
   return (
     <div className="min-h-screen animated-bg">
       <header className="border-b border-slate-800 bg-slate-900/50 backdrop-blur-xl sticky top-0 z-10">
@@ -129,10 +133,10 @@ export default function ProfilePage() {
                 <UserIcon className="h-4 w-4 md:h-6 md:w-6 text-primary" />
               </div>
               <Badge
-                variant={user.role === "admin" ? "default" : user.role === "vip" ? "secondary" : "outline"}
+                variant={role === "admin" ? "default" : role === "vip" ? "secondary" : "outline"}
                 className="text-xs"
               >
-                {user.role.toUpperCase()}
+                {role.toUpperCase()}
               </Badge>
             </div>
             <h3 className="text-xl md:text-2xl font-bold text-foreground mb-1 truncate">{user.email}</h3>

@@ -73,5 +73,12 @@
     "tw-animate-css": "1.3.3",
     "typescript": "^5",
     "typescript-eslint": "^8.46.2"
+  },
+  "pnpm": {
+    "neverBuiltDependencies": [
+      "@firebase/util",
+      "protobufjs",
+      "sharp"
+    ]
   }
 }

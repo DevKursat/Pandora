@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   // Bakım modunun durumunu kontrol etmek için API'mize bir istek atıyoruz.
   // URL'yi dinamik olarak oluşturarak hem yerel hem de canlı ortamda çalışmasını sağlıyoruz.
   const statusUrl = new URL('/api/admin/maintenance/status', request.url);

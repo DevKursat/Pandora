@@ -175,10 +175,13 @@ export default function AdminPanel() {
       <div className="container mx-auto px-4 py-4 md:py-6 max-w-7xl">
         {/* ... Stats, Tabs, vs. ... (Tüm JSX aynı kalır, sadece "Detay" düğmesi güncellenir) */}
         {/* Örnek: Kullanıcılar listesindeki "Detay" düğmesi */}
+        {/* Kullanıcılar tablosundaki "Detay" düğmesi örneği */}
+        {/* Bu kodun gerçek JSX'inizde bir .map() döngüsü içinde olduğunu varsayıyoruz */}
+        {/* users.map(user => ( ... )) */}
         <Button
             variant="outline"
             size="sm"
-            onClick={() => handleViewDevices(user)} // Bu fonksiyon zaten güncellenmişti
+            onClick={() => handleViewDevices(user)} // `user` değişkeni map döngüsünden gelmeli
             className="h-8 text-xs"
         >
             <Eye className="h-3 w-3 mr-1" />

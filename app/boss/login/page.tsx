@@ -1,23 +1,23 @@
 "use client"
 
 import type React from "react"
-
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import { signInWithEmailAndPassword } from "firebase/auth"
+import { auth } from "@/lib/firebase"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { Shield, AlertCircle, Lock } from "lucide-react"
+import { Shield, AlertCircle, Lock, Eye, EyeOff } from "lucide-react"
 import { SplashScreen } from "@/components/splash-screen"
-import { auth } from "@/lib/firebase"
-import { signInWithEmailAndPassword } from "firebase/auth"
 
 export default function AdminLogin() {
   const [showSplash, setShowSplash] = useState(true)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
@@ -28,20 +28,17 @@ export default function AdminLogin() {
     setIsLoading(true)
 
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password)
-      const tokenResult = await userCredential.user.getIdTokenResult();
-      if (tokenResult.claims.role !== 'admin') {
-        setError("Bu sayfaya erişim yetkiniz yok.");
-        auth.signOut();
-      } else {
-        router.push("/boss")
-      }
+      await signInWithEmailAndPassword(auth, email, password)
+      // On successful login, the onAuthUserChanged listener in the main
+      // admin page will handle redirection. We can just push to the boss page.
+      router.push("/boss")
     } catch (error: any) {
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        setError("E-posta veya şifre hatalı.")
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/user-not-found' || error.code === 'auth/invalid-credential') {
+        setError("Geçersiz e-posta veya şifre.")
       } else {
         setError("Giriş sırasında bir hata oluştu. Lütfen tekrar deneyin.")
       }
+      console.error("Admin login error:", error)
     } finally {
       setIsLoading(false)
     }
@@ -77,7 +74,7 @@ export default function AdminLogin() {
               <Input
                 id="email"
                 type="email"
-                placeholder="admin@example.com"
+                placeholder="ornek@email.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
@@ -85,26 +82,37 @@ export default function AdminLogin() {
                 className="bg-slate-800/50 border-slate-700 focus:border-primary h-11"
               />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 relative">
               <Label htmlFor="password" className="text-sm font-medium">
                 Şifre
               </Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={isLoading}
-                className="bg-slate-800/50 border-slate-700 focus:border-primary h-11"
-              />
+              <div className="relative">
+                 <Input
+                    id="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="••••••••"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    disabled={isLoading}
+                    className="bg-slate-800/50 border-slate-700 focus:border-primary h-11 pr-10"
+                 />
+                 <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="absolute right-0 top-0 h-full"
+                    onClick={() => setShowPassword(!showPassword)}
+                 >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                 </Button>
+              </div>
             </div>
             {error && (
               <Alert variant="destructive" className="bg-destructive/10 border-destructive/50">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
-              </Alert>
+              </Aler>
             )}
             <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={isLoading}>
               {isLoading ? "Doğrulanıyor..." : "Giriş Yap"}

@@ -196,12 +196,15 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
   const router = useRouter()
 
   const [canExecuteQuery, setCanExecuteQuery] = useState(false);
+  const [role, setRole] = useState("demo");
 
   useEffect(() => {
     const checkUserRole = async () => {
       if (user) {
-        const canQuery = await isVipOrAdmin(user);
-        setCanExecuteQuery(canQuery);
+        const tokenResult = await user.getIdTokenResult();
+        const userRole = (tokenResult.claims.role as string) || "demo";
+        setRole(userRole);
+        setCanExecuteQuery(userRole === "admin" || userRole === "vip");
       }
     };
     checkUserRole();
@@ -344,10 +347,10 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
               <div className="text-right hidden sm:block">
                 <p className="text-sm font-medium text-foreground">{user?.email}</p>
                 <Badge
-                  variant={user?.role === "admin" ? "default" : user?.role === "vip" ? "secondary" : "outline"}
+                  variant={role === "admin" ? "default" : role === "vip" ? "secondary" : "outline"}
                   className="text-xs"
                 >
-                  {user?.role === "admin" ? "YÖNETİCİ" : user?.role === "vip" ? "VIP" : "DEMO"}
+                  {role === "admin" ? "YÖNETİCİ" : role === "vip" ? "VIP" : "DEMO"}
                 </Badge>
               </div>
               <Button

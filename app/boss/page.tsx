@@ -966,7 +966,9 @@ export default function AdminPanel() {
               <Smartphone className="h-5 w-5 text-primary" />
               {selectedUser?.email} - Cihaz ve Giriş Detayları
             </DialogTitle>
-            <DialogDescription>Kullanıcının tüm cihazları ve giriş geçmişi</DialogDescription>
+            <DialogDescription>
+              Kullanıcının tüm cihazlarının ve giriş geçmişinin detaylı dökümü.
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-6">
             <div>

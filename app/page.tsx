@@ -6,17 +6,16 @@ import { LoginForm } from "@/components/login-form"
 import { SplashScreen } from "@/components/splash-screen"
 import { onAuthUserChanged, User } from "@/lib/auth"
 import { MaintenancePage } from "@/components/maintenance-page"
-import { isMaintenanceMode } from "@/lib/maintenance"
+import { useRouter } from 'next/navigation'
+
 
 export default function Home() {
   const [showSplash, setShowSplash] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [isChecking, setIsChecking] = useState(true)
-  const [maintenance, setMaintenance] = useState(false)
+  const router = useRouter()
 
   useEffect(() => {
-    setMaintenance(isMaintenanceMode())
-
     const unsubscribe = onAuthUserChanged((user) => {
       setUser(user)
       setIsChecking(false)
@@ -30,17 +29,13 @@ export default function Home() {
     return <SplashScreen onComplete={() => setShowSplash(false)} />
   }
 
-  if (maintenance) {
-    return <MaintenancePage />
-  }
-
   if (isChecking) {
     // You can return a loader here if you want
     return null
   }
 
   if (!user) {
-    return <LoginForm onLoginSuccess={() => setIsChecking(true)} />
+    return <LoginForm onLoginSuccess={() => router.refresh()} />
   }
 
   return (

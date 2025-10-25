@@ -112,7 +112,7 @@ export default function AdminLogin() {
               <Alert variant="destructive" className="bg-destructive/10 border-destructive/50">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
-              </Aler>
+              </Alert>
             )}
             <Button type="submit" className="w-full h-11 text-base font-semibold" disabled={isLoading}>
               {isLoading ? "Doğrulanıyor..." : "Giriş Yap"}

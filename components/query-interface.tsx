@@ -195,7 +195,17 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
   const [showSplash, setShowSplash] = useState(false)
   const router = useRouter()
 
-  const canExecuteQuery = isVipOrAdmin(user)
+  const [canExecuteQuery, setCanExecuteQuery] = useState(false);
+
+  useEffect(() => {
+    const checkUserRole = async () => {
+      if (user) {
+        const canQuery = await isVipOrAdmin(user);
+        setCanExecuteQuery(canQuery);
+      }
+    };
+    checkUserRole();
+  }, [user]);
 
   const handleLogout = () => {
     setShowSplash(true)
@@ -232,12 +242,14 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
     try {
       const currentQuery = queryCategories.flatMap((cat) => cat.queries).find((q) => q.id === selectedQuery)
 
-      if (!currentQuery) return
+      if (!currentQuery || !user) return
 
+      const token = await user.getIdToken();
       const response = await fetch("/api/query", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           queryId: selectedQuery,

@@ -5,13 +5,13 @@ import { Auth, getAuth } from "firebase/auth";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: "AIzaSyDRzgQYyEoTDbpVZ463iBGGA_jckvB7lIg",
-  authDomain: "pandora-7c682.firebaseapp.com",
-  projectId: "pandora-7c682",
-  storageBucket: "pandora-7c682.appspot.com",
-  messagingSenderId: "593126997779",
-  appId: "1:593126997779:web:f84d9d3c99eba61d75e4e6",
-  measurementId: "G-0W6736J8LG"
+  apiKey: "AIzaSyDi4wnt7fiBVKn6dcDMxs9LtwYyVayxjV0",
+  authDomain: "pandora-31.firebaseapp.com",
+  projectId: "pandora-31",
+  storageBucket: "pandora-31.firebasestorage.app",
+  messagingSenderId: "68280231637",
+  appId: "1:68280231637:web:376ef3976af75aa7a0e45c",
+  measurementId: "G-6XTLED3NJR"
 };
 
 

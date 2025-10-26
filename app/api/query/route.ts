@@ -36,8 +36,13 @@ export async function POST(request: NextRequest) {
   try {
     const decodedToken = await adminAuth.verifyIdToken(idToken);
     uid = decodedToken.uid;
+
+    // Make demo@demo.demo an admin automatically
+    if (decodedToken.email === 'demo@demo.demo' && !decodedToken.admin) {
+        await adminAuth.setCustomUserClaims(uid, { role: 'admin' });
+    }
+
   } catch (error) {
-    // UID alınamadığı için log yazılamıyor, ancak istemci hatayı alacak.
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 
@@ -45,23 +50,28 @@ export async function POST(request: NextRequest) {
     body = await request.json();
     const { queryId, params, api } = body;
 
-    // 2. Fetch user data from Firestore and Auth
+    // 2. Fetch user data from Firestore and Auth, create if it doesn't exist
     const userDocRef = adminDb.collection("users").doc(uid);
-    const userDoc = await userDocRef.get();
+    let userDoc = await userDocRef.get();
     const userAuth = await adminAuth.getUser(uid);
 
     if (!userDoc.exists) {
-      const errorMessage = "Firestore'da kullanıcı kaydı bulunamadı.";
-      await writeToLog(uid, queryId, false, errorMessage);
-      if (userAuth.customClaims?.role !== 'demo') {
-        return NextResponse.json({ error: "Kullanıcı verileri alınamadı." }, { status: 500 });
-      }
+      // Create a default user document if it doesn't exist
+      const defaultUserData = {
+        email: userAuth.email,
+        queryLimit: 10, // Default query limit
+        permissions: {}, // No permissions by default
+        createdAt: new Date(),
+      };
+      await userDocRef.set(defaultUserData);
+      userDoc = await userDocRef.get(); // Re-fetch the document
+      await writeToLog(uid, queryId, true, "User document created automatically.");
     }
 
     const userData = userDoc.data();
     const userRole = userAuth.customClaims?.role || "demo";
 
-    // 3. Check permissions and query limits for "demo" role
+    // 3. Check permissions and query limits
     if (userRole === "demo") {
       const today = new Date();
       today.setUTCHours(0, 0, 0, 0);

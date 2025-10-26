@@ -25,16 +25,8 @@ export async function GET(request: NextRequest) {
   return withAuth(request, async (decodedToken) => {
     const uid = decodedToken.uid;
     try {
-      // Remove orderBy from the query to avoid needing a composite index immediately.
-      const queryLogsSnapshot = await adminDb.collection("queryLogs").where("uid", "==", uid).limit(50).get();
-
-      // Sort the results in code.
-      const activity = queryLogsSnapshot.docs.map(doc => doc.data()).sort((a, b) => {
-        const timestampA = a.timestamp._seconds || a.timestamp.seconds;
-        const timestampB = b.timestamp._seconds || b.timestamp.seconds;
-        return timestampB - timestampA;
-      });
-
+      const queryLogsSnapshot = await adminDb.collection("queryLogs").where("uid", "==", uid).orderBy("timestamp", "desc").limit(50).get();
+      const activity = queryLogsSnapshot.docs.map(doc => doc.data());
       return NextResponse.json(activity);
     } catch (error) {
       console.error("Error fetching user activity:", error);

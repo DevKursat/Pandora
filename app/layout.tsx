@@ -7,7 +7,7 @@ import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
 import { cookies } from 'next/headers'
 import MaintenancePage from './maintenance/page'
-import { adminDb, adminAuth } from '@/lib/firebase-admin'; // Doğrudan SDK'yı içe aktar
+import { headers } from 'next/headers'
 
 const _geist = Geist({ subsets: ["latin"] })
 const _geistMono = Geist_Mono({ subsets: ["latin"] })
@@ -18,44 +18,41 @@ export const metadata: Metadata = {
   generator: "v0.app",
 }
 
-export const dynamic = 'force-dynamic'; // Dinamik render'ı zorla
+export const dynamic = 'force-dynamic'; // Force dynamic rendering
 
-// API çağrıları yerine doğrudan Firebase Admin SDK kullanarak bakım ve admin durumunu kontrol et
 async function checkMaintenanceAndAdmin() {
+  const absoluteUrl = (path: string) => {
+    const host = headers().get('host');
+    const protocol = process.env.NODE_ENV === 'production' ? 'https' : 'http';
+    return `${protocol}://${host}${path}`;
+  }
+
   try {
-    // Bakım durumunu doğrudan Firestore'dan kontrol et
-    const maintenanceRef = adminDb.collection('settings').doc('maintenance');
-    const doc = await maintenanceRef.get();
-    const isMaintenanceEnabled = doc.exists && doc.data()?.enabled === true;
+    const maintenanceRes = await fetch(absoluteUrl('/api/maintenance-check'), { next: { revalidate: 0 } });
+    if (!maintenanceRes.ok) throw new Error('Bakım durumu kontrol edilemedi');
+    const { isEnabled } = await maintenanceRes.json();
 
-    // Bakım modu kapalıysa, daha fazla kontrol yapmaya gerek yok
-    if (!isMaintenanceEnabled) {
-      return { isMaintenance: false, isAdmin: false };
-    }
+    if (!isEnabled) return { isMaintenance: false, isAdmin: false };
 
-    // Bakım modu açıksa, kullanıcının admin olup olmadığını kontrol et
     const token = cookies().get('firebaseIdToken')?.value;
     let isAdmin = false;
 
     if (token) {
-      try {
-        const decodedToken = await adminAuth.verifyIdToken(token);
-        if (decodedToken.role === 'admin') {
+      const verifyRes = await fetch(absoluteUrl('/api/verify-token'), {
+        headers: { 'Authorization': `Bearer ${token}` },
+        next: { revalidate: 0 }
+      });
+      if (verifyRes.ok) {
+        const { role } = await verifyRes.json();
+        if (role === 'admin') {
           isAdmin = true;
         }
-      } catch (error) {
-        // Token doğrulama hatası (ör. süresi dolmuş), admin olmadığını varsay
-        console.warn("Token doğrulama hatası:", error);
-        isAdmin = false;
       }
     }
-
     return { isMaintenance: true, isAdmin };
-
   } catch (error) {
-    console.error("Layout'ta bakım/admin durumu kontrol edilirken hata oluştu:", error);
-    // Hata durumunda, kullanıcıların kilitlenmesini önlemek için bakım modunu kapalı varsay
-    return { isMaintenance: false, isAdmin: false };
+    console.error("Layoutta bakım/admin kontrolü hatası:", error);
+    return { isMaintenance: false, isAdmin: false }; // Hata durumunda, kilitlenmeyi önle
   }
 }
 

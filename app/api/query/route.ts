@@ -1,30 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
-// Helper function to write simplified logs to Firestore
-async function writeToLog(
-  uid: string,
-  queryId: string | null,
-  success: boolean,
-  error: string | null
-) {
+// Helper function to write summarized logs to Firestore
+async function writeToLog(logData: any) {
   try {
-    const logEntry = {
-      uid,
-      queryId,
-      timestamp: new Date(),
-      success,
-      error,
+    // Sadece temel ve özet bilgileri kaydet
+    const minimalLog = {
+      uid: logData.uid,
+      step: logData.step,
+      body: {
+        queryId: logData.body?.queryId,
+        params: logData.body?.params,
+        api: logData.body?.api,
+      },
+      error: logData.error || null,
+      timestamp: new Date().toISOString(),
     };
-    await adminDb.collection("queryLogs").add(logEntry);
-  } catch (e) {
-    console.error("Failed to write to log collection:", e);
+    await adminDb.collection("queryLogs").add(minimalLog);
+  } catch (error) {
+    console.error("Failed to write to log collection:", error);
   }
 }
 
 export async function POST(request: NextRequest) {
-  let uid: string;
-  let body: any;
+  const logData: any = { step: "start" };
 
   // 1. Authenticate the user
   const authorization = request.headers.get("Authorization");
@@ -33,39 +32,35 @@ export async function POST(request: NextRequest) {
   }
   const idToken = authorization.split("Bearer ")[1];
 
+  let decodedToken;
   try {
-    const decodedToken = await adminAuth.verifyIdToken(idToken);
-    uid = decodedToken.uid;
-
-    // Make demo@demo.demo an admin automatically
-    if (decodedToken.email === 'demo@demo.demo' && !decodedToken.admin) {
-        await adminAuth.setCustomUserClaims(uid, { role: 'admin' });
-    }
-
+    decodedToken = await adminAuth.verifyIdToken(idToken);
   } catch (error) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 
+  const uid = decodedToken.uid;
+  logData.uid = uid;
+
   try {
-    body = await request.json();
+    const body = await request.json();
+    logData.body = body;
     const { queryId, params, api } = body;
 
-    // 2. Fetch user data from Firestore and Auth, create if it doesn't exist
+    // 2. Fetch user data from Firestore and Auth
     const userDocRef = adminDb.collection("users").doc(uid);
-    let userDoc = await userDocRef.get();
+    const userDoc = await userDocRef.get();
     const userAuth = await adminAuth.getUser(uid);
 
+    // Kullanıcı belgesi Firestore'da yoksa hata yönetimi
     if (!userDoc.exists) {
-      // Create a default user document if it doesn't exist
-      const defaultUserData = {
-        email: userAuth.email,
-        queryLimit: 10, // Default query limit
-        permissions: {}, // No permissions by default
-        createdAt: new Date(),
-      };
-      await userDocRef.set(defaultUserData);
-      userDoc = await userDocRef.get(); // Re-fetch the document
-      await writeToLog(uid, queryId, true, "User document created automatically.");
+        logData.step = "error";
+        logData.error = "Firestore'da kullanıcı kaydı bulunamadı.";
+        await writeToLog(logData);
+        // Demo kullanıcı değilse erişimi engelle, demoya varsayılan limitle izin ver
+        if (userAuth.customClaims?.role !== 'demo') {
+            return NextResponse.json({ error: "Kullanıcı verileri alınamadı." }, { status: 500 });
+        }
     }
 
     const userData = userDoc.data();
@@ -73,20 +68,20 @@ export async function POST(request: NextRequest) {
 
     // 3. Check permissions and query limits
     if (userRole === "demo") {
-      const today = new Date();
-      today.setUTCHours(0, 0, 0, 0);
-
+      const today = new Date().toISOString().split('T')[0];
       const queryLogsSnapshot = await adminDb.collection("queryLogs")
         .where("uid", "==", uid)
-        .where("timestamp", ">=", today)
+        .where("timestamp", ">=", `${today}T00:00:00.000Z`)
+        .where("timestamp", "<=", `${today}T23:59:59.999Z`)
         .get();
 
       const dailyQueryCount = queryLogsSnapshot.size;
-      const dailyLimit = userData?.queryLimit || 10;
+      const dailyLimit = userData?.queryLimit || 10; // Firestore'da kayıt yoksa varsayılan limit 10
 
       if (dailyQueryCount >= dailyLimit) {
-        const errorMessage = "Günlük sorgu limiti aşıldı.";
-        await writeToLog(uid, queryId, false, errorMessage);
+        logData.step = "error";
+        logData.error = "Günlük sorgu limiti aşıldı.";
+        await writeToLog(logData);
         return NextResponse.json({ error: "Günlük sorgu limitinizi aştınız." }, { status: 429 });
       }
     }
@@ -94,9 +89,10 @@ export async function POST(request: NextRequest) {
     // 3.5. Check permissions ONLY for non-admin/non-vip users
     if (userRole !== "admin" && userRole !== "vip") {
         if (!userData?.permissions || !userData.permissions[queryId]) {
-            const errorMessage = "Bu sorguyu yapma yetkisi yok.";
-            await writeToLog(uid, queryId, false, errorMessage);
-            return NextResponse.json({ error: errorMessage }, { status: 403 });
+            logData.step = "error";
+            logData.error = "Bu sorguyu yapma yetkisi yok.";
+            await writeToLog(logData);
+            return NextResponse.json({ error: "Bu sorguyu yapma yetkiniz yok." }, { status: 403 });
         }
     }
 
@@ -158,26 +154,29 @@ export async function POST(request: NextRequest) {
       headers: { "User-Agent": "Mozilla/5.0" },
     });
 
+    const responseText = await response.text();
+
     if (!response.ok) {
-      const errorMessage = `API hatası: ${response.status}`;
-      await writeToLog(uid, queryId, false, errorMessage);
+      logData.step = "api_error";
+      logData.error = `API hatası: ${response.status}`;
+      await writeToLog(logData);
       return NextResponse.json({ error: "API isteği başarısız oldu" }, { status: response.status });
     }
 
-    await writeToLog(uid, queryId, true, null);
+    logData.step = "success";
+    await writeToLog(logData);
 
-    const responseText = await response.text();
     try {
       const data = JSON.parse(responseText);
       return NextResponse.json(data);
     } catch (e) {
       return NextResponse.json({ result: responseText });
     }
-
   } catch (error: any) {
     console.error("Error in /api/query:", error);
-    const queryId = body ? body.queryId : "unknown";
-    await writeToLog(uid, queryId, false, error.message);
+    logData.step = "internal_error";
+    logData.error = error.message;
+    await writeToLog(logData);
     return NextResponse.json({ error: "Sorgu sırasında bir hata oluştu" }, { status: 500 });
   }
 }

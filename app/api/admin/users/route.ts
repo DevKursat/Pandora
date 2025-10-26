@@ -28,38 +28,37 @@ export async function GET(request: NextRequest) {
   return withAdminAuth(request, async () => {
     try {
       const listUsersResult = await adminAuth.listUsers(1000);
+      const users = listUsersResult.users.map((userRecord) => {
+        const customClaims = (userRecord.customClaims || {}) as { role?: string; vipExpiry?: string };
+        return {
+          uid: userRecord.uid,
+          email: userRecord.email,
+          role: customClaims.role || "demo",
+          createdAt: userRecord.metadata.creationTime,
+          lastLogin: userRecord.metadata.lastSignInTime,
+          vipExpiryDate: customClaims.vipExpiry,
+        };
+      });
 
-      const usersWithDeviceCounts = await Promise.all(
-        listUsersResult.users.map(async (userRecord) => {
-          const customClaims = (userRecord.customClaims || {}) as { role?: string; vipExpiry?: string };
+      // Fetch device and IP data from Firestore
+      const devicesSnapshot = await adminDb.collection('devices').get();
+      const userDeviceData: { [key: string]: { deviceCount: number, uniqueIPs: Set<string> } } = {};
 
-          let deviceCount = 0;
-          let uniqueIPs = new Set<string>();
+      devicesSnapshot.forEach(doc => {
+        const data = doc.data();
+        const userId = data.userId;
+        if (!userDeviceData[userId]) {
+          userDeviceData[userId] = { deviceCount: 0, uniqueIPs: new Set() };
+        }
+        userDeviceData[userId].deviceCount += 1;
+        userDeviceData[userId].uniqueIPs.add(data.ipAddress);
+      });
 
-          // Check if 'devices' collection exists before querying to avoid errors on a fresh DB
-          const collections = await adminDb.listCollections();
-          if (collections.map(c => c.id).includes('devices')) {
-            const devicesSnapshot = await adminDb.collection('devices').where('userId', '==', userRecord.uid).get();
-            if (!devicesSnapshot.empty) {
-                deviceCount = devicesSnapshot.size;
-                devicesSnapshot.forEach(doc => {
-                    uniqueIPs.add(doc.data().ipAddress);
-                });
-            }
-          }
-
-          return {
-            uid: userRecord.uid,
-            email: userRecord.email,
-            role: customClaims.role || "demo",
-            createdAt: userRecord.metadata.creationTime,
-            lastLogin: userRecord.metadata.lastSignInTime,
-            vipExpiryDate: customClaims.vipExpiry,
-            deviceCount: deviceCount,
-            uniqueIPs: uniqueIPs.size,
-          };
-        })
-      );
+      const usersWithDeviceCounts = users.map(user => ({
+        ...user,
+        deviceCount: userDeviceData[user.uid]?.deviceCount || 0,
+        uniqueIPs: userDeviceData[user.uid] ? userDeviceData[user.uid].uniqueIPs.size : 0,
+      }));
 
       return NextResponse.json(usersWithDeviceCounts);
     } catch (error) {

@@ -49,7 +49,7 @@ async function recordUserActivity(uid: string, request: NextRequest) {
     await batch.commit();
 
   } catch (error) {
-    console.error("Failed to record user activity:", error);
+    console.error("Kullanıcı aktivitesi kaydedilirken HATA oluştu:", error);
   }
 }
 

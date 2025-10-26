@@ -326,10 +326,6 @@ export default function AdminPanel() {
     }
   }
 
-  if (showSplash) {
-    return <SplashScreen onComplete={() => setShowSplash(false)} duration={1500} />
-  }
-
   if (!isAuthorized) {
     return null
   }

@@ -1,7 +1,7 @@
+import { NextResponse } from 'next/server';
 import admin from 'firebase-admin';
 
-// DİKKAT: Kimlik bilgilerini koda gömmek ciddi bir güvenlik açığıdır.
-// Bu işlem, kullanıcının açık talebi ve riskleri anladığını belirtmesi üzerine yapılmıştır.
+// Kullanıcı tarafından sağlanan ve soruna neden olabilecek servis hesabı bilgileri
 const serviceAccount = {
   projectId: "pandora-43736",
   clientEmail: "firebase-adminsdk-fbsvc@pandora-43736.iam.gserviceaccount.com",
@@ -32,19 +32,46 @@ Mwn1r3vQGLcrgVmnpLX8bhExibXbJeyLUwaaeNT/AoGBANxlxBY1ldQN5g1bhyH7
 3tCm8/eWyg7kFTZuZCktMeuNrBTlQ9Fg1y9vR555WwRVrJCeF4wjw+q1/29pHZ4t
 zbBY9pmUzA08E1ylnPTzc6JSgz81zT6SNPKi/1gKmYsvPcu3WD+Twpeq9KfFH13y
 YvG+e5wlyEyNZ3S6u6GT/O3B
------END PRIVATE KEY-----`,
+-----END PRIVATE KEY-----`.replace(/\\n/g, '\n'),
 };
 
-if (!admin.apps.length) {
+export async function GET() {
   try {
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount as any),
+    // Firebase'in zaten başlatılıp başlatılmadığını kontrol et
+    if (!admin.apps.length) {
+      console.log('Firebase Admin SDK başlatılıyor...');
+      admin.initializeApp({
+        credential: admin.credential.cert(serviceAccount as any),
+      });
+      console.log('Firebase Admin SDK başarıyla başlatıldı.');
+    } else {
+      console.log('Firebase Admin SDK zaten başlatılmış.');
+    }
+
+    // Firestore'a erişerek bağlantıyı doğrula
+    const db = admin.firestore();
+    console.log('Firestore örneği alındı. Koleksiyonlar listeleniyor...');
+    const collections = await db.listCollections();
+    const collectionIds = collections.map(col => col.id);
+    console.log('Koleksiyonlar başarıyla listelendi:', collectionIds);
+
+    return NextResponse.json({
+      status: 'success',
+      message: 'Firebase Admin SDK başarıyla başlatıldı ve Firestore bağlantısı doğrulandı.',
+      collections: collectionIds,
     });
   } catch (error: any) {
-    console.error('Firebase Admin SDK başlatılamadı:', error);
-    throw new Error(`Firebase Admin SDK başlatma hatası: ${error.message}`);
+    console.error('TEST API HATASI: Firebase işlemi başarısız oldu.', error);
+    return NextResponse.json(
+      {
+        status: 'error',
+        message: 'Firebase Admin SDK başlatılamadı veya Firestore ile iletişim kurulamadı.',
+        errorName: error.name,
+        errorMessage: error.message,
+        errorCode: error.code,
+        errorStack: error.stack,
+      },
+      { status: 500 }
+    );
   }
 }
-
-export const adminAuth = admin.auth();
-export const adminDb = admin.firestore();

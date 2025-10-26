@@ -200,16 +200,32 @@ export default function ProfilePage() {
                <div className="text-xs text-muted-foreground mt-2 space-y-1 text-center sm:text-left">
                 <p>Oluşturulma: {new Date(user.metadata.creationTime!).toLocaleDateString("tr-TR")}</p>
                 {userRole === "vip" && vipExpiryDate && (
-                  <p>VIP Bitiş: {new Date(vipExpiryDate).toLocaleDateString("tr-TR")}</p>
+                  <p>
+                    VIP Bitiş: {new Date(vipExpiryDate).toLocaleDateString("tr-TR")}
+                    <span className="font-semibold text-primary">
+                      {" "}
+                      (
+                      {Math.ceil(
+                        (new Date(vipExpiryDate).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)
+                      )}{" "}
+                      gün kaldı)
+                    </span>
+                  </p>
                 )}
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row gap-2 sm:ml-auto">
+             <div className="flex flex-col sm:flex-row gap-2 sm:ml-auto">
                <Button onClick={() => router.push("/")} variant="outline">
                  <ArrowLeft className="mr-2 h-4 w-4" />
                 Geri Dön
               </Button>
-              <Button onClick={() => signOut(auth)} variant="destructive">
+              <Button
+                onClick={async () => {
+                  await signOut(auth);
+                  router.push('/');
+                }}
+                variant="destructive"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 Çıkış Yap
               </Button>
@@ -289,7 +305,7 @@ export default function ProfilePage() {
                         <p className="text-xs text-muted-foreground">{log.timestamp}</p>
                       </div>
                       <Badge variant={log.status === "success" ? "default" : "destructive"}>
-                        {log.status}
+                        {log.status === "success" ? "Başarılı" : "Başarısız"}
                       </Badge>
                     </li>
                   ))

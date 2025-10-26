@@ -41,7 +41,10 @@ import {
   UserCircle,
 } from "lucide-react"
 import { QueryResult } from "@/components/query-result"
-import { logout, isVipOrAdmin, User as AuthUser } from "@/lib/auth"
+import { onAuthUserChanged } from "@/lib/auth.client"
+import { auth } from "@/lib/firebase"
+import { signOut } from "firebase/auth"
+import type { User as AuthUser } from "firebase/auth"
 import { SplashScreen } from "@/components/splash-screen"
 import { useRouter } from "next/navigation"
 
@@ -237,8 +240,9 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
   const handleLogout = () => {
     setShowSplash(true)
     setTimeout(() => {
-      logout()
-      window.location.reload()
+      signOut(auth).then(() => {
+        window.location.reload()
+      });
     }, 1000)
   }
 
@@ -255,7 +259,9 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
   const handleSubmit = async () => {
     if (!selectedQuery) return;
 
-    if (!canExecuteQuery) {
+    const userCanQuery = role === 'admin' || role === 'vip';
+
+    if (!userCanQuery) {
       setResult({
         error: "VIP erişim gerekli",
         message: "Sorgu yapmak için VIP üyelik gereklidir. Telegram: @ErSocietyPlus",

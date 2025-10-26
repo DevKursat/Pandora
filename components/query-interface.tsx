@@ -41,10 +41,7 @@ import {
   UserCircle,
 } from "lucide-react"
 import { QueryResult } from "@/components/query-result"
-import { onAuthUserChanged } from "@/lib/auth.client"
-import { auth } from "@/lib/firebase"
-import { signOut } from "firebase/auth"
-import type { User as AuthUser } from "firebase/auth"
+import { logout, isVipOrAdmin, User as AuthUser } from "@/lib/auth"
 import { SplashScreen } from "@/components/splash-screen"
 import { useRouter } from "next/navigation"
 
@@ -240,9 +237,8 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
   const handleLogout = () => {
     setShowSplash(true)
     setTimeout(() => {
-      signOut(auth).then(() => {
-        window.location.reload()
-      });
+      logout()
+      window.location.reload()
     }, 1000)
   }
 
@@ -259,9 +255,7 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
   const handleSubmit = async () => {
     if (!selectedQuery) return;
 
-    const userCanQuery = role === 'admin' || role === 'vip';
-
-    if (!userCanQuery) {
+    if (!canExecuteQuery) {
       setResult({
         error: "VIP erişim gerekli",
         message: "Sorgu yapmak için VIP üyelik gereklidir. Telegram: @ErSocietyPlus",
@@ -518,12 +512,10 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
                   <div className="space-y-4">
                     {currentQuery?.params.map((param) => (
                       <div key={param}>
-                        <label htmlFor={param} className="text-xs md:text-sm font-medium text-foreground mb-2 block">
+                        <label className="text-xs md:text-sm font-medium text-foreground mb-2 block">
                           {getParamLabel(param)}
                         </label>
                         <Input
-                          id={param}
-                          name={param}
                           placeholder={`${getParamLabel(param)} giriniz...`}
                           value={queryParams[param] || ""}
                           onChange={(e) => handleParamChange(param, e.target.value)}

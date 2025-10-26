@@ -45,36 +45,22 @@ export async function POST(request: NextRequest) {
     logData.body = body;
     const { queryId, params, api } = body;
 
-    // 2. Fetch user data from Firestore and Auth, now with robust checks
-    let userAuth, userData, userRole;
+    // 2. Fetch user data from Firestore and Auth
+    let userDoc, userAuth, userData, userRole;
     try {
       logData.step = "fetch_user_data_start";
-      userAuth = await adminAuth.getUser(uid);
-      userRole = userAuth.customClaims?.role || "demo";
-
       const userDocRef = adminDb.collection("users").doc(uid);
-      const userDoc = await userDocRef.get();
-
-      if (!userDoc.exists) {
-        // This is the critical fix: Handle cases where a user exists in Auth but not in Firestore 'users' collection.
-        console.warn(`Firestore user document not found for UID: ${uid}`);
-        // For non-admin/vip roles that depend on Firestore permissions, this is a critical error.
-        if (userRole !== "admin" && userRole !== "vip") {
-             logData.step = "firestore_profile_missing_critical";
-             await writeToLog(logData);
-             return NextResponse.json({ error: "Hesap senkronizasyon sorunu", message: "Hesabınızın yapılandırması eksik. Lütfen yöneticiyle iletişime geçin." }, { status: 500 });
-        }
-        // For admin/vip, we can proceed with default/empty data, as they have universal access.
-        userData = {};
-      } else {
-        userData = userDoc.data();
-      }
+      userDoc = await userDocRef.get();
+      userAuth = await adminAuth.getUser(uid);
+      userData = userDoc.data();
+      userRole = userAuth.customClaims?.role || "demo";
       logData.step = "fetch_user_data_success";
     } catch (dbError: any) {
       console.error("Firestore/Auth Error:", dbError);
       logData.step = "fetch_user_data_error";
       logData.error = { message: dbError.message, code: dbError.code };
       await writeToLog(logData);
+      // Check for specific Firestore index error
       if (dbError.code === 'failed-precondition') {
           return NextResponse.json({ error: "Veritabanı hatası", message: "Gerekli veritabanı indeksi eksik. Lütfen yöneticiyle iletişime geçin." }, { status: 500 });
       }
@@ -154,10 +140,10 @@ export async function POST(request: NextRequest) {
       });
 
       responseText = await response.text();
+      logData.response_body = responseText;
 
       if (!response.ok) {
         logData.step = "api_error";
-        logData.response_summary = { success: false, status: response.status, length: responseText.length };
         await writeToLog(logData);
         return NextResponse.json({ error: "Harici API hatası", message: `Sorgu API'si ${response.status} durum kodu ile başarısız oldu.` }, { status: 502 }); // Bad Gateway
       }
@@ -173,7 +159,6 @@ export async function POST(request: NextRequest) {
     }
 
     logData.step = "success";
-    logData.response_summary = { success: true, length: responseText.length };
     await writeToLog(logData);
 
     // 6. Parse and return the result

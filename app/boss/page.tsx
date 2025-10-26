@@ -766,30 +766,33 @@ export default function AdminPanel() {
                   {Array.isArray(queryLogs) && queryLogs.map((log, index) => (
                     <div
                       key={index}
-                      className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 border border-slate-700 flex-wrap gap-2"
+                      className="p-3 rounded-lg bg-slate-800/50 border border-slate-700 flex flex-col items-start"
                     >
-                      <div className="flex items-center gap-3">
-                        <Search className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium text-foreground">{log.body?.queryId || 'N/A'}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {log.uid} • {new Date(log.timestamp).toLocaleString("tr-TR")}
-                          </p>
+                      <div className="flex items-center justify-between w-full flex-wrap gap-2">
+                        <div className="flex items-center gap-3">
+                          <Search className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm font-medium text-foreground">{log.queryId || 'N/A'}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {log.uid} • {new Date(log.timestamp._seconds * 1000).toLocaleString("tr-TR")}
+                            </p>
+                          </div>
                         </div>
+                        <Badge
+                          variant={log.success ? "default" : "destructive"}
+                          className="text-xs"
+                        >
+                          {log.success ? (
+                            <CheckCircle className="h-3 w-3 mr-1" />
+                          ) : (
+                            <XCircle className="h-3 w-3 mr-1" />
+                          )}
+                          {log.success ? "Başarılı" : "Başarısız"}
+                        </Badge>
                       </div>
-                      <Badge
-                        variant={
-                          log.step === "success" ? "default" : "destructive"
-                        }
-                        className="text-xs"
-                      >
-                        {log.step === "success" ? (
-                          <CheckCircle className="h-3 w-3 mr-1" />
-                        ) : (
-                          <XCircle className="h-3 w-3 mr-1" />
-                        )}
-                        {log.step}
-                      </Badge>
+                      {log.error && (
+                        <p className="text-xs text-red-400 mt-2 pl-7">{log.error}</p>
+                      )}
                     </div>
                   ))}
                 </div>

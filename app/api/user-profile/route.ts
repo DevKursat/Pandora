@@ -34,7 +34,8 @@ export async function GET(request: NextRequest) {
       // Get query logs
       const queryLogsSnapshot = await adminDb.collection("queryLogs").where("uid", "==", uid).get();
       const totalQueries = queryLogsSnapshot.size;
-      const successfulQueries = queryLogsSnapshot.docs.filter(doc => doc.data().step === 'success').length;
+      // Use the new 'success' boolean field for accurate counting.
+      const successfulQueries = queryLogsSnapshot.docs.filter(doc => doc.data().success === true).length;
 
       // Get VIP expiry
       const customClaims = (userRecord.customClaims || {}) as { vipExpiry?: string };

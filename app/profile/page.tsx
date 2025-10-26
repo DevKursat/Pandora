@@ -243,18 +243,21 @@ export default function ProfilePage() {
                   <div key={index} className="p-3 md:p-4 rounded-lg bg-slate-800/50 border border-slate-700">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        {log.step === "success" ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
+                        {log.success ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
                         <div>
-                          <p className="text-xs md:text-sm font-medium text-foreground">{log.body?.queryId || 'N/A'}</p>
+                          <p className="text-xs md:text-sm font-medium text-foreground">{log.queryId || 'N/A'}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {new Date(log.timestamp).toLocaleString("tr-TR")}
+                            {new Date(log.timestamp._seconds * 1000).toLocaleString("tr-TR")}
                           </p>
                         </div>
                       </div>
-                      <Badge variant={log.step === "success" ? "default" : "destructive"} className="text-xs w-fit">
-                        {log.step}
+                      <Badge variant={log.success ? "default" : "destructive"} className="text-xs w-fit">
+                        {log.success ? "Başarılı" : "Başarısız"}
                       </Badge>
                     </div>
+                     {log.error && (
+                        <p className="text-xs text-red-400 mt-2 pl-7">{log.error}</p>
+                    )}
                   </div>
                 ))}
                 {activity.length === 0 && (

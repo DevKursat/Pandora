@@ -21,7 +21,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
 import { SplashScreen } from "@/components/splash-screen"
-import { onAuthUserChanged, User } from "@/lib/auth"
+import { onAuthUserChanged } from "@/lib/auth.client"
+import type { User } from "firebase/auth"
 import { auth } from "@/lib/firebase"
 import {
   Shield,
@@ -106,23 +107,24 @@ export default function AdminPanel() {
         return;
       }
       setIsAuthorized(true);
-      loadAdminData();
-      fetchMaintenanceStatus();
     });
 
     return () => unsubscribe();
   }, [router]);
 
   useEffect(() => {
-    if (!isAuthorized) return
+    if (isAuthorized) {
+      loadAdminData();
+      fetchMaintenanceStatus();
 
-    const interval = setInterval(() => {
-      loadAdminData()
-      setLastRefresh(new Date())
-    }, 5000)
+      const interval = setInterval(() => {
+        loadAdminData();
+        setLastRefresh(new Date());
+      }, 5000); // Refresh data every 5 seconds
 
-    return () => clearInterval(interval)
-  }, [isAuthorized])
+      return () => clearInterval(interval);
+    }
+  }, [isAuthorized]);
 
   const getAuthHeader = async () => {
     const user = auth.currentUser;

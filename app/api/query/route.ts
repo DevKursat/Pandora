@@ -140,10 +140,10 @@ export async function POST(request: NextRequest) {
       });
 
       responseText = await response.text();
-      logData.response_body = responseText;
 
       if (!response.ok) {
         logData.step = "api_error";
+        logData.response_summary = { success: false, status: response.status, length: responseText.length };
         await writeToLog(logData);
         return NextResponse.json({ error: "Harici API hatası", message: `Sorgu API'si ${response.status} durum kodu ile başarısız oldu.` }, { status: 502 }); // Bad Gateway
       }
@@ -159,6 +159,7 @@ export async function POST(request: NextRequest) {
     }
 
     logData.step = "success";
+    logData.response_summary = { success: true, length: responseText.length };
     await writeToLog(logData);
 
     // 6. Parse and return the result

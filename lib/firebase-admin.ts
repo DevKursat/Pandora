@@ -11,6 +11,12 @@ if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
 if (!admin.apps.length) {
   try {
     const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string);
+
+    // Explicitly replace escaped newlines in the private key to fix parsing errors
+    if (serviceAccount.private_key) {
+      serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
+    }
+
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });

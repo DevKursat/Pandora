@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import { QueryInterface } from "@/components/query-interface"
 import { LoginForm } from "@/components/login-form"
 import { SplashScreen } from "@/components/splash-screen"
-import { onAuthUserChanged, User } from "@/lib/auth"
+import { onAuthUserChanged } from "@/lib/auth.client"
+import type { User } from "firebase/auth"
 import { MaintenancePage } from "@/components/maintenance-page"
 import { useRouter } from 'next/navigation'
 

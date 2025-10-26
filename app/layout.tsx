@@ -15,11 +15,8 @@ export const metadata: Metadata = {
   generator: "v0.app",
 }
 
-// force-dynamic is not strictly necessary here anymore, but good for consistency.
 export const dynamic = 'force-dynamic';
 
-// The RootLayout is now simple. It sets up the basic page structure and providers.
-// All complex auth and maintenance checks will be handled by client components inside the pages.
 export default function RootLayout({
   children,
 }: Readonly<{

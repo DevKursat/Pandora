@@ -60,7 +60,6 @@ export default function AdminPanel() {
   const [users, setUsers] = useState<any[]>([])
   const [queryLogs, setQueryLogs] = useState<any[]>([])
   const [activeUsers, setActiveUsers] = useState<string[]>([])
-  const [ipData, setIpData] = useState<any[]>([])
   const [isAddUserOpen, setIsAddUserOpen] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [lastRefresh, setLastRefresh] = useState(new Date())
@@ -147,22 +146,20 @@ export default function AdminPanel() {
 
   const loadAdminData = async () => {
     try {
-      const headers = await getAuthHeader();
-      const [usersRes, logsRes, activeRes, ipRes] = await Promise.all([
+        const headers = await getAuthHeader();
+      const [usersRes, logsRes, activeRes] = await Promise.all([
         fetch("/api/admin/users", { headers }),
         fetch("/api/admin/logs", { headers }),
         fetch("/api/admin/active", { headers }),
-        fetch("/api/admin/devices", { headers }),
-      ]);
+      ])
 
-      if (usersRes.ok) setUsers(await usersRes.json());
-      if (logsRes.ok) setQueryLogs(await logsRes.json());
-      if (activeRes.ok) setActiveUsers(await activeRes.json());
-      if (ipRes.ok) setIpData(await ipRes.json());
+      if (usersRes.ok) setUsers(await usersRes.json())
+      if (logsRes.ok) setQueryLogs(await logsRes.json())
+      if (activeRes.ok) setActiveUsers(await activeRes.json())
     } catch (error) {
-      console.error("Failed to load admin data:", error);
+      console.error("Failed to load admin data:", error)
     }
-  };
+  }
 
   const loadUserDevices = async (userId: string) => {
     try {
@@ -688,55 +685,71 @@ export default function AdminPanel() {
 
           <TabsContent value="devices" className="space-y-4">
             <Card className="p-4 md:p-6 bg-slate-900/50 border-slate-800 backdrop-blur-sm">
-              <div className="flex items-center justify-between mb-4 md:mb-6">
-                <div className="flex items-center gap-2">
-                  <Globe className="h-5 w-5 text-primary" />
-                  <h3 className="text-base md:text-lg font-semibold text-foreground">IP Adresine Göre Gruplandırılmış Cihazlar</h3>
-                </div>
-                <Badge variant="outline">{ipData.length} Benzersiz IP</Badge>
+              <div className="flex items-center gap-2 mb-4 md:mb-6">
+                <Smartphone className="h-5 w-5 text-primary" />
+                <h3 className="text-base md:text-lg font-semibold text-foreground">Cihaz ve IP İzleme</h3>
               </div>
               <ScrollArea className="h-[400px] md:h-[500px]">
-                <div className="space-y-4">
-                  {ipData.map((ip) => (
-                    <div key={ip.ipAddress} className="p-4 rounded-lg bg-slate-800/50 border border-slate-700">
-                      <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="space-y-3">
+                  {users.map((user) => (
+                    <div
+                      key={user.uid}
+                      className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-primary/50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                         <div className="flex items-center gap-3">
-                          <Globe className="h-6 w-6 text-primary" />
+                          <Users className="h-5 w-5 text-primary" />
                           <div>
-                            <p className="text-lg font-bold text-foreground">{ip.ipAddress}</p>
-                            <p className="text-xs text-muted-foreground">
-                              Son Görülme: {new Date(ip.lastSeen).toLocaleString('tr-TR')}
+                            <p className="text-sm font-medium text-foreground">{user.email}</p>
+                            <Badge variant={user.role === "vip" ? "secondary" : "outline"} className="text-xs mt-1">
+                              {user.role.toUpperCase()}
+                            </Badge>
+                          </div>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={() => handleViewDevices(user)} className="text-xs">
+                          <Eye className="h-3 w-3 mr-1" />
+                          Detaylı Görüntüle
+                        </Button>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                        <div className="flex items-center gap-2 p-2 rounded bg-slate-900/50">
+                          <Smartphone className="h-4 w-4 text-primary" />
+                          <div>
+                            <p className="text-xs text-muted-foreground">Cihaz Sayısı</p>
+                            <p className="text-sm font-medium text-foreground">{user.deviceCount || 0}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 p-2 rounded bg-slate-900/50">
+                          <Globe className="h-4 w-4 text-primary" />
+                          <div>
+                            <p className="text-xs text-muted-foreground">Farklı IP</p>
+                            <p className="text-sm font-medium text-foreground">{user.uniqueIPs || 0}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 p-2 rounded bg-slate-900/50">
+                          <Clock className="h-4 w-4 text-primary" />
+                          <div>
+                            <p className="text-xs text-muted-foreground">Son Giriş</p>
+                            <p className="text-xs font-medium text-foreground">
+                              {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString("tr-TR") : "Yok"}
                             </p>
                           </div>
                         </div>
-                         <div className="flex items-center gap-4 text-sm">
-                            <div className="text-center">
-                                <p className="font-bold">{ip.userCount}</p>
-                                <p className="text-xs text-muted-foreground">Kullanıcı</p>
-                            </div>
-                            <div className="text-center">
-                                <p className="font-bold">{ip.totalLogins}</p>
-                                <p className="text-xs text-muted-foreground">Giriş</p>
-                            </div>
+                        <div className="flex items-center gap-2 p-2 rounded bg-slate-900/50">
+                          <Activity className="h-4 w-4 text-primary" />
+                          <div>
+                            <p className="text-xs text-muted-foreground">Durum</p>
+                            <Badge
+                              variant={activeUsers.includes(user.email) ? "default" : "outline"}
+                              className="text-xs"
+                            >
+                              {activeUsers.includes(user.email) ? "Aktif" : "Çevrimdışı"}
+                            </Badge>
+                          </div>
                         </div>
-                      </div>
-                      <div className="mt-4 space-y-2">
-                         {ip.users.map((user: any) => (
-                            <div key={user.uid} className="flex items-center justify-between p-2 rounded bg-slate-900/50">
-                                <p className="text-sm">{user.email}</p>
-                                <Badge variant="secondary">{user.deviceCount} Cihaz</Badge>
-                            </div>
-                         ))}
                       </div>
                     </div>
                   ))}
-                   {ipData.length === 0 && (
-                      <div className="text-center py-10">
-                        <Globe className="mx-auto h-12 w-12 text-muted-foreground" />
-                        <h3 className="mt-2 text-sm font-medium text-foreground">Veri Yok</h3>
-                        <p className="mt-1 text-sm text-muted-foreground">Görüntülenecek cihaz veya IP verisi bulunamadı.</p>
-                      </div>
-                    )}
                 </div>
               </ScrollArea>
             </Card>
@@ -753,33 +766,30 @@ export default function AdminPanel() {
                   {Array.isArray(queryLogs) && queryLogs.map((log, index) => (
                     <div
                       key={index}
-                      className="p-3 rounded-lg bg-slate-800/50 border border-slate-700 flex flex-col items-start"
+                      className="flex items-center justify-between p-3 rounded-lg bg-slate-800/50 border border-slate-700 flex-wrap gap-2"
                     >
-                      <div className="flex items-center justify-between w-full flex-wrap gap-2">
-                        <div className="flex items-center gap-3">
-                          <Search className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm font-medium text-foreground">{log.queryId || 'N/A'}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {log.uid} • {new Date(log.timestamp._seconds * 1000).toLocaleString("tr-TR")}
-                            </p>
-                          </div>
+                      <div className="flex items-center gap-3">
+                        <Search className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm font-medium text-foreground">{log.body?.queryId || 'N/A'}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {log.uid} • {new Date(log.timestamp).toLocaleString("tr-TR")}
+                          </p>
                         </div>
-                        <Badge
-                          variant={log.success ? "default" : "destructive"}
-                          className="text-xs"
-                        >
-                          {log.success ? (
-                            <CheckCircle className="h-3 w-3 mr-1" />
-                          ) : (
-                            <XCircle className="h-3 w-3 mr-1" />
-                          )}
-                          {log.success ? "Başarılı" : "Başarısız"}
-                        </Badge>
                       </div>
-                      {log.error && (
-                        <p className="text-xs text-red-400 mt-2 pl-7">{log.error}</p>
-                      )}
+                      <Badge
+                        variant={
+                          log.step === "success" ? "default" : "destructive"
+                        }
+                        className="text-xs"
+                      >
+                        {log.step === "success" ? (
+                          <CheckCircle className="h-3 w-3 mr-1" />
+                        ) : (
+                          <XCircle className="h-3 w-3 mr-1" />
+                        )}
+                        {log.step}
+                      </Badge>
                     </div>
                   ))}
                 </div>

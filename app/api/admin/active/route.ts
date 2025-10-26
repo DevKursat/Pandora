@@ -27,12 +27,6 @@ async function withAdminAuth(
 export async function GET(request: NextRequest) {
   return withAdminAuth(request, async () => {
     try {
-      // Check if 'activeUsers' collection exists before querying
-      const collections = await adminDb.listCollections();
-      if (!collections.map(c => c.id).includes('activeUsers')) {
-        return NextResponse.json([]);
-      }
-
       const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
 
       const activeUsersSnapshot = await adminDb.collection('activeUsers')
@@ -43,8 +37,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json(activeUsers);
     } catch (error) {
       console.error("Error fetching active users:", error);
-      // If the query fails for other reasons, return empty array
-      return NextResponse.json([]);
+      return NextResponse.json({ error: "Failed to fetch active users" }, { status: 500 });
     }
   });
 }

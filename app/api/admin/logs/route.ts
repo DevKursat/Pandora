@@ -27,19 +27,12 @@ async function withAdminAuth(
 export async function GET(request: NextRequest) {
   return withAdminAuth(request, async () => {
     try {
-      // Check if 'queryLogs' collection exists before querying to avoid errors on a fresh DB
-      const collections = await adminDb.listCollections();
-      if (!collections.map(c => c.id).includes('queryLogs')) {
-        return NextResponse.json([]);
-      }
-
       const logsSnapshot = await adminDb.collection('queryLogs').orderBy('timestamp', 'desc').limit(100).get();
       const logs = logsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
       return NextResponse.json(logs);
     } catch (error) {
       console.error("Error fetching logs:", error);
-      // If the query fails for other reasons (like missing index), return empty array
-      return NextResponse.json([]);
+      return NextResponse.json({ error: "Failed to fetch logs" }, { status: 500 });
     }
   });
 }

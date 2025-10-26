@@ -58,6 +58,7 @@ export default function AdminPanel() {
   const [showSplash, setShowSplash] = useState(true)
   const [isAuthorized, setIsAuthorized] = useState(false)
   const [users, setUsers] = useState<any[]>([])
+  const [ipData, setIpData] = useState<any[]>([])
   const [queryLogs, setQueryLogs] = useState<any[]>([])
   const [activeUsers, setActiveUsers] = useState<string[]>([])
   const [isAddUserOpen, setIsAddUserOpen] = useState(false)
@@ -147,15 +148,17 @@ export default function AdminPanel() {
   const loadAdminData = async () => {
     try {
         const headers = await getAuthHeader();
-      const [usersRes, logsRes, activeRes] = await Promise.all([
+      const [usersRes, logsRes, activeRes, devicesRes] = await Promise.all([
         fetch("/api/admin/users", { headers }),
         fetch("/api/admin/logs", { headers }),
         fetch("/api/admin/active", { headers }),
+        fetch("/api/admin/devices", { headers }),
       ])
 
       if (usersRes.ok) setUsers(await usersRes.json())
       if (logsRes.ok) setQueryLogs(await logsRes.json())
       if (activeRes.ok) setActiveUsers(await activeRes.json())
+      if (devicesRes.ok) setIpData(await devicesRes.json())
     } catch (error) {
       console.error("Failed to load admin data:", error)
     }
@@ -686,71 +689,33 @@ export default function AdminPanel() {
           <TabsContent value="devices" className="space-y-4">
             <Card className="p-4 md:p-6 bg-slate-900/50 border-slate-800 backdrop-blur-sm">
               <div className="flex items-center gap-2 mb-4 md:mb-6">
-                <Smartphone className="h-5 w-5 text-primary" />
-                <h3 className="text-base md:text-lg font-semibold text-foreground">Cihaz ve IP İzleme</h3>
+                <Globe className="h-5 w-5 text-primary" />
+                <h3 className="text-base md:text-lg font-semibold text-foreground">IP Adresine Göre Cihazlar</h3>
               </div>
               <ScrollArea className="h-[400px] md:h-[500px]">
-                <div className="space-y-3">
-                  {users.map((user) => (
-                    <div
-                      key={user.uid}
-                      className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-primary/50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                        <div className="flex items-center gap-3">
-                          <Users className="h-5 w-5 text-primary" />
-                          <div>
-                            <p className="text-sm font-medium text-foreground">{user.email}</p>
-                            <Badge variant={user.role === "vip" ? "secondary" : "outline"} className="text-xs mt-1">
-                              {user.role.toUpperCase()}
-                            </Badge>
-                          </div>
-                        </div>
-                        <Button variant="outline" size="sm" onClick={() => handleViewDevices(user)} className="text-xs">
-                          <Eye className="h-3 w-3 mr-1" />
-                          Detaylı Görüntüle
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="flex items-center gap-2 p-2 rounded bg-slate-900/50">
-                          <Smartphone className="h-4 w-4 text-primary" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Cihaz Sayısı</p>
-                            <p className="text-sm font-medium text-foreground">{user.deviceCount || 0}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 p-2 rounded bg-slate-900/50">
-                          <Globe className="h-4 w-4 text-primary" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Farklı IP</p>
-                            <p className="text-sm font-medium text-foreground">{user.uniqueIPs || 0}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 p-2 rounded bg-slate-900/50">
-                          <Clock className="h-4 w-4 text-primary" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Son Giriş</p>
-                            <p className="text-xs font-medium text-foreground">
-                              {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString("tr-TR") : "Yok"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 p-2 rounded bg-slate-900/50">
-                          <Activity className="h-4 w-4 text-primary" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Durum</p>
-                            <Badge
-                              variant={activeUsers.includes(user.email) ? "default" : "outline"}
-                              className="text-xs"
-                            >
-                              {activeUsers.includes(user.email) ? "Aktif" : "Çevrimdışı"}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+                <table className="w-full text-sm text-left">
+                  <thead className="text-xs text-muted-foreground uppercase bg-slate-800/50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3">IP Adresi</th>
+                      <th scope="col" className="px-6 py-3">Kullanıcı Sayısı</th>
+                      <th scope="col" className="px-6 py-3">Cihaz Sayısı</th>
+                      <th scope="col" className="px-6 py-3">Son Görülme</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {ipData.sort((a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()).map((ipInfo) => (
+                      <tr key={ipInfo.ip} className="border-b border-slate-700 hover:bg-slate-800/50">
+                        <td className="px-6 py-4 font-medium text-foreground">{ipInfo.ip}</td>
+                        <td className="px-6 py-4">{ipInfo.userCount}</td>
+                        <td className="px-6 py-4">{ipInfo.deviceCount}</td>
+                        <td className="px-6 py-4">{ipInfo.lastSeen ? new Date(ipInfo.lastSeen).toLocaleString('tr-TR') : 'N/A'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                 {ipData.length === 0 && (
+                  <p className="text-sm text-muted-foreground text-center py-8">İzlenecek cihaz veya IP verisi bulunamadı.</p>
+                )}
               </ScrollArea>
             </Card>
           </TabsContent>

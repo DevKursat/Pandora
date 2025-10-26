@@ -23,32 +23,56 @@ async function withAdminAuth(
   }
 }
 
-// GET user devices or login history
+// GET aggregated device and IP information
 export async function GET(request: NextRequest) {
   return withAdminAuth(request, async () => {
-    const { searchParams } = new URL(request.url);
-    const userId = searchParams.get("userId");
-    const type = searchParams.get("type"); // 'devices' or 'history'
-
-    if (!userId) {
-      return NextResponse.json({ error: "User ID is required" }, { status: 400 });
-    }
-
     try {
-      if (type === 'devices') {
-        const devicesSnapshot = await adminDb.collection('devices').where('userId', '==', userId).get();
-        const devices = devicesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        return NextResponse.json(devices);
-      } else if (type === 'history') {
-        const historySnapshot = await adminDb.collection('loginHistory').where('userId', '==', userId).orderBy('timestamp', 'desc').limit(50).get();
-        const history = historySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-        return NextResponse.json(history);
-      } else {
-        return NextResponse.json({ error: "Invalid type specified" }, { status: 400 });
-      }
+      const devicesSnapshot = await adminDb.collection('devices').get();
+      const loginHistorySnapshot = await adminDb.collection('loginHistory').get();
+
+      const ipData: { [key: string]: { users: Set<string>; devices: Set<string>; lastSeen: Date | null } } = {};
+
+      // Process devices
+      devicesSnapshot.forEach(doc => {
+        const device = doc.data();
+        const ip = device.ipAddress || 'Unknown';
+        if (!ipData[ip]) {
+          ipData[ip] = { users: new Set(), devices: new Set(), lastSeen: null };
+        }
+        ipData[ip].users.add(device.userId);
+        ipData[ip].devices.add(doc.id);
+        const lastSeen = device.lastSeen?.toDate();
+        if (!ipData[ip].lastSeen || (lastSeen && lastSeen > ipData[ip].lastSeen!)) {
+          ipData[ip].lastSeen = lastSeen;
+        }
+      });
+
+      // Process login history
+      loginHistorySnapshot.forEach(doc => {
+        const history = doc.data();
+        const ip = history.ipAddress || 'Unknown';
+        if (!ipData[ip]) {
+          ipData[ip] = { users: new Set(), devices: new Set(), lastSeen: null };
+        }
+        ipData[ip].users.add(history.userId);
+        const timestamp = history.timestamp?.toDate();
+        if (!ipData[ip].lastSeen || (timestamp && timestamp > ipData[ip].lastSeen!)) {
+          ipData[ip].lastSeen = timestamp;
+        }
+      });
+
+      const result = Object.keys(ipData).map(ip => ({
+        ip,
+        userCount: ipData[ip].users.size,
+        deviceCount: ipData[ip].devices.size,
+        lastSeen: ipData[ip].lastSeen
+      }));
+
+      return NextResponse.json(result);
+
     } catch (error) {
-      console.error(`Error fetching user ${type}:`, error);
-      return NextResponse.json({ error: `Failed to fetch user ${type}` }, { status: 500 });
+      console.error(`Error fetching aggregated device data:`, error);
+      return NextResponse.json({ error: `Failed to fetch aggregated device data` }, { status: 500 });
     }
   });
 }

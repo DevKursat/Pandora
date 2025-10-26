@@ -8,20 +8,42 @@ import { onAuthUserChanged, User } from "@/lib/auth"
 import { MaintenancePage } from "@/components/maintenance-page"
 import { useRouter } from 'next/navigation'
 
-
 export default function Home() {
   const [showSplash, setShowSplash] = useState(true)
   const [user, setUser] = useState<User | null>(null)
-  const [isChecking, setIsChecking] = useState(true)
+  const [isCheckingAuth, setIsCheckingAuth] = useState(true)
+  const [isMaintenance, setIsMaintenance] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
+  const [isCheckingMaintenance, setIsCheckingMaintenance] = useState(true);
   const router = useRouter()
 
   useEffect(() => {
-    const unsubscribe = onAuthUserChanged((user) => {
+    const checkMaintenance = async () => {
+      try {
+        const res = await fetch('/api/admin/maintenance');
+        if (res.ok) {
+          const data = await res.json();
+          setIsMaintenance(data.isEnabled);
+        }
+      } catch (error) {
+        console.error("Bakım modu kontrol edilemedi:", error);
+      } finally {
+        setIsCheckingMaintenance(false);
+      }
+    };
+    checkMaintenance();
+
+    const unsubscribe = onAuthUserChanged(async (user) => {
       setUser(user)
-      setIsChecking(false)
+      if (user) {
+        const tokenResult = await user.getIdTokenResult();
+        setIsAdmin(tokenResult.claims.role === 'admin' || user.email === 'demo@demo.demo');
+      } else {
+        setIsAdmin(false);
+      }
+      setIsCheckingAuth(false)
     })
 
-    // Cleanup subscription on unmount
     return () => unsubscribe()
   }, [])
 
@@ -29,9 +51,12 @@ export default function Home() {
     return <SplashScreen onComplete={() => setShowSplash(false)} />
   }
 
-  if (isChecking) {
-    // You can return a loader here if you want
+  if (isCheckingAuth || isCheckingMaintenance) {
     return null
+  }
+
+  if (isMaintenance && !isAdmin) {
+      return <MaintenancePage />;
   }
 
   if (!user) {

@@ -1,3 +1,17 @@
 
 > my-v0-project@0.1.0 dev /app
 > DEBUG=* next dev
+
+ ⚠ Port 3000 is in use, trying 3001 instead.
+ ⚠ Port 3001 is in use, trying 3002 instead.
+ ⚠ Port 3002 is in use, trying 3003 instead.
+ ⚠ Port 3003 is in use, trying 3004 instead.
+ ⚠ Port 3004 is in use, trying 3005 instead.
+  ▲ Next.js 14.2.0
+  - Local:        http://localhost:3005
+
+ ✓ Starting...
+2025-10-26T21:54:02.122Z next:router-server:filesystem nextDataRoutes Set(0) {}
+2025-10-26T21:54:02.124Z next:router-server:filesystem dynamicRoutes []
+2025-10-26T21:54:02.124Z next:router-server:filesystem pageFiles Set(0) {}
+2025-10-26T21:54:02.124Z next:router-server:filesystem appFiles Set(0) {}

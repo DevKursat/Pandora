@@ -253,50 +253,47 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
   }
 
   const handleSubmit = async () => {
-    if (!selectedQuery) return;
+    if (!selectedQuery) return
 
     if (!canExecuteQuery) {
       setResult({
         error: "VIP erişim gerekli",
         message: "Sorgu yapmak için VIP üyelik gereklidir. Telegram: @ErSocietyPlus",
-      });
-      return;
+      })
+      return
     }
 
-    setLoading(true);
-    setResult(null);
+    setLoading(true)
+    setResult(null)
 
     try {
-      const currentQuery = queryCategories.flatMap((cat) => cat.queries).find((q) => q.id === selectedQuery);
+      const currentQuery = queryCategories.flatMap((cat) => cat.queries).find((q) => q.id === selectedQuery)
 
-      if (!currentQuery || !user) return;
+      if (!currentQuery || !user) return
 
       const token = await user.getIdToken();
       const response = await fetch("/api/query", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          "Authorization": `Bearer ${token}`
         },
         body: JSON.stringify({
           queryId: selectedQuery,
           params: queryParams,
           api: currentQuery.api,
         }),
-      });
+      })
 
-      const data = await response.json();
-      setResult(data);
+      const data = await response.json()
+      setResult(data)
     } catch (error) {
-      console.error("[v0] Query error:", error);
-      setResult({
-        error: "İstemci Hatası",
-        message: "Sorgu sunucusuna ulaşılamadı. Lütfen internet bağlantınızı kontrol edin veya daha sonra tekrar deneyin.",
-      });
+      console.error("[v0] Query error:", error)
+      setResult({ error: "Sorgu sırasında bir hata oluştu" })
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  };
+  }
 
   const currentQuery = queryCategories.flatMap((cat) => cat.queries).find((q) => q.id === selectedQuery)
 

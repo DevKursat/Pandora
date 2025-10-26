@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { onAuthUserChanged } from "@/lib/auth.client"
 import { auth, db } from "@/lib/firebase"
 import { updatePassword, signOut, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth"
-import { collection, query, where, getDocs, orderBy, limit } from "firebase/firestore"
+import { collection, query, where, getDocs, orderBy, limit, doc, getDoc } from "firebase/firestore"
 import type { User } from "firebase/auth"
 import { SplashScreen } from "@/components/splash-screen"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -27,6 +27,7 @@ import {
   Globe,
   Eye,
   EyeOff,
+  ArrowLeft,
 } from "lucide-react"
 
 interface QueryLog {
@@ -55,6 +56,8 @@ export default function ProfilePage() {
   const [queryLogs, setQueryLogs] = useState<QueryLog[]>([])
   const [devices, setDevices] = useState<Device[]>([])
   const [userRole, setUserRole] = useState("demo")
+  const [vipExpiryDate, setVipExpiryDate] = useState<string | null>(null)
+
 
   const router = useRouter()
   const { toast } = useToast()
@@ -82,18 +85,26 @@ export default function ProfilePage() {
         where("uid", "==", uid),
         orderBy("timestamp", "desc"),
         limit(10)
-      )
-      const logsSnapshot = await getDocs(logsQuery)
+      );
+      const logsSnapshot = await getDocs(logsQuery);
       const logsData = logsSnapshot.docs.map(
         (doc) =>
           ({
             id: doc.id,
             timestamp: new Date(doc.data().timestamp).toLocaleString("tr-TR"),
             queryId: doc.data().body?.queryId || "Bilinmeyen Sorgu",
-            status: doc.data().step,
+            status: doc.data().step, // Captures all steps, including errors
           } as QueryLog)
-      )
-      setQueryLogs(logsData)
+      );
+      setQueryLogs(logsData);
+
+       // Fetch user profile data from Firestore for extra details
+      const userDocRef = doc(db, "users", uid);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data();
+        setVipExpiryDate(userData.vipExpiryDate || null);
+      }
 
       // Fetch Devices
       const devicesQuery = query(collection(db, "devices"), where("uid", "==", uid), limit(5))
@@ -179,18 +190,30 @@ export default function ProfilePage() {
             </div>
             <div className="text-center sm:text-left">
               <CardTitle className="text-2xl font-bold">{user.email}</CardTitle>
-              <CardDescription className="flex items-center gap-2 justify-center sm:justify-start">
-                <Badge variant={userRole === "admin" || userRole === "vip" ? "default" : "secondary"}>
+              <CardDescription className="flex flex-col sm:flex-row items-center gap-2 justify-center sm:justify-start">
+                 <Badge variant={userRole === "admin" || userRole === "vip" ? "default" : "secondary"}>
                   {userRole.toUpperCase()}
                 </Badge>
-                <span>•</span>
+                <span className="hidden sm:inline">•</span>
                 <span>ID: {user.uid}</span>
               </CardDescription>
+               <div className="text-xs text-muted-foreground mt-2 space-y-1 text-center sm:text-left">
+                <p>Oluşturulma: {new Date(user.metadata.creationTime!).toLocaleDateString("tr-TR")}</p>
+                {userRole === "vip" && vipExpiryDate && (
+                  <p>VIP Bitiş: {new Date(vipExpiryDate).toLocaleDateString("tr-TR")}</p>
+                )}
+              </div>
             </div>
-            <Button onClick={() => signOut(auth)} variant="outline" className="sm:ml-auto">
-              <LogOut className="mr-2 h-4 w-4" />
-              Çıkış Yap
-            </Button>
+            <div className="flex flex-col sm:flex-row gap-2 sm:ml-auto">
+               <Button onClick={() => router.push("/")} variant="outline">
+                 <ArrowLeft className="mr-2 h-4 w-4" />
+                Geri Dön
+              </Button>
+              <Button onClick={() => signOut(auth)} variant="destructive">
+                <LogOut className="mr-2 h-4 w-4" />
+                Çıkış Yap
+              </Button>
+            </div>
           </CardHeader>
         </Card>
 

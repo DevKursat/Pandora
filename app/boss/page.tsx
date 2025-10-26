@@ -10,6 +10,12 @@ import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -61,6 +67,7 @@ export default function AdminPanel() {
   const [users, setUsers] = useState<any[]>([])
   const [queryLogs, setQueryLogs] = useState<any[]>([])
   const [activeUsers, setActiveUsers] = useState<string[]>([])
+  const [ipGroups, setIpGroups] = useState<any[]>([])
   const [isAddUserOpen, setIsAddUserOpen] = useState(false)
   const [showPassword, setShowPassword] = useState(false)
   const [lastRefresh, setLastRefresh] = useState(new Date())
@@ -148,20 +155,22 @@ export default function AdminPanel() {
 
   const loadAdminData = async () => {
     try {
-        const headers = await getAuthHeader();
-      const [usersRes, logsRes, activeRes] = await Promise.all([
+      const headers = await getAuthHeader();
+      const [usersRes, logsRes, activeRes, devicesRes] = await Promise.all([
         fetch("/api/admin/users", { headers }),
         fetch("/api/admin/logs", { headers }),
         fetch("/api/admin/active", { headers }),
-      ])
+        fetch("/api/admin/devices", { headers }), // Fetch the new IP grouped data
+      ]);
 
-      if (usersRes.ok) setUsers(await usersRes.json())
-      if (logsRes.ok) setQueryLogs(await logsRes.json())
-      if (activeRes.ok) setActiveUsers(await activeRes.json())
+      if (usersRes.ok) setUsers(await usersRes.json());
+      if (logsRes.ok) setQueryLogs(await logsRes.json());
+      if (activeRes.ok) setActiveUsers(await activeRes.json());
+      if (devicesRes.ok) setIpGroups(await devicesRes.json());
     } catch (error) {
-      console.error("Failed to load admin data:", error)
+      console.error("Failed to load admin data:", error);
     }
-  }
+  };
 
   const loadUserDevices = async (userId: string) => {
     try {
@@ -684,71 +693,41 @@ export default function AdminPanel() {
           <TabsContent value="devices" className="space-y-4">
             <Card className="p-4 md:p-6 bg-slate-900/50 border-slate-800 backdrop-blur-sm">
               <div className="flex items-center gap-2 mb-4 md:mb-6">
-                <Smartphone className="h-5 w-5 text-primary" />
-                <h3 className="text-base md:text-lg font-semibold text-foreground">Cihaz ve IP İzleme</h3>
+                <Globe className="h-5 w-5 text-primary" />
+                <h3 className="text-base md:text-lg font-semibold text-foreground">IP Adresine Göre Gruplama</h3>
               </div>
               <ScrollArea className="h-[400px] md:h-[500px]">
-                <div className="space-y-3">
-                  {users.map((user) => (
-                    <div
-                      key={user.uid}
-                      className="p-4 rounded-lg bg-slate-800/50 border border-slate-700 hover:border-primary/50 transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-                        <div className="flex items-center gap-3">
-                          <Users className="h-5 w-5 text-primary" />
-                          <div>
-                            <p className="text-sm font-medium text-foreground">{user.email}</p>
-                            <Badge variant={user.role === "vip" ? "secondary" : "outline"} className="text-xs mt-1">
-                              {user.role.toUpperCase()}
-                            </Badge>
+                <Accordion type="single" collapsible className="w-full">
+                  {ipGroups.map((group) => (
+                    <AccordionItem key={group.ip} value={group.ip} className="border-slate-800">
+                      <AccordionTrigger className="hover:no-underline">
+                        <div className="flex items-center justify-between w-full">
+                           <div className="flex items-center gap-3">
+                             <Globe className="h-4 w-4 text-primary" />
+                            <span className="font-semibold text-sm">{group.ip}</span>
+                          </div>
+                          <div className="flex items-center gap-4 text-xs">
+                             <Badge variant="outline">{group.userCount} Kullanıcı</Badge>
+                            <Badge variant="secondary">{group.deviceCount} Cihaz</Badge>
+                            <Badge>{group.totalConnections} Bağlantı</Badge>
                           </div>
                         </div>
-                        <Button variant="outline" size="sm" onClick={() => handleViewDevices(user)} className="text-xs">
-                          <Eye className="h-3 w-3 mr-1" />
-                          Detaylı Görüntüle
-                        </Button>
-                      </div>
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        <div className="flex items-center gap-2 p-2 rounded bg-slate-900/50">
-                          <Smartphone className="h-4 w-4 text-primary" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Cihaz Sayısı</p>
-                            <p className="text-sm font-medium text-foreground">{user.deviceCount || 0}</p>
-                          </div>
+                      </AccordionTrigger>
+                      <AccordionContent>
+                        <div className="pl-6 pt-2">
+                          <h4 className="font-semibold text-xs mb-2 text-primary">KULLANICILAR ({group.users.length})</h4>
+                          <ul className="list-disc list-inside text-xs space-y-1 mb-4">
+                            {group.users.map((email: string, i: number) => <li key={i}>{email}</li>)}
+                          </ul>
+                          <h4 className="font-semibold text-xs mb-2 text-primary">CİHAZLAR ({group.devices.length})</h4>
+                           <ul className="list-disc list-inside text-xs space-y-1">
+                            {group.devices.map((device: string, i: number) => <li key={i}>{device}</li>)}
+                          </ul>
                         </div>
-                        <div className="flex items-center gap-2 p-2 rounded bg-slate-900/50">
-                          <Globe className="h-4 w-4 text-primary" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Farklı IP</p>
-                            <p className="text-sm font-medium text-foreground">{user.uniqueIPs || 0}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 p-2 rounded bg-slate-900/50">
-                          <Clock className="h-4 w-4 text-primary" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Son Giriş</p>
-                            <p className="text-xs font-medium text-foreground">
-                              {user.lastLogin ? new Date(user.lastLogin).toLocaleDateString("tr-TR") : "Yok"}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2 p-2 rounded bg-slate-900/50">
-                          <Activity className="h-4 w-4 text-primary" />
-                          <div>
-                            <p className="text-xs text-muted-foreground">Durum</p>
-                            <Badge
-                              variant={activeUsers.includes(user.email) ? "default" : "outline"}
-                              className="text-xs"
-                            >
-                              {activeUsers.includes(user.email) ? "Aktif" : "Çevrimdışı"}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
+                      </AccordionContent>
+                    </AccordionItem>
                   ))}
-                </div>
+                </Accordion>
               </ScrollArea>
             </Card>
           </TabsContent>

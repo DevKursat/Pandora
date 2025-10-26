@@ -1,18 +1,22 @@
 import admin from 'firebase-admin';
 
-// Check for the environment variable and throw a clear error if it's missing.
-if (!process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON) {
-  console.error("Firebase Admin SDK initialization failed: GOOGLE_APPLICATION_CREDENTIALS_JSON environment variable is not set.");
-  // In a local development environment, you might want to throw an error to halt execution.
-  // In production, you should have robust error handling and logging.
-  throw new Error("Missing Firebase Admin credentials. The service cannot start.");
-}
+// This function ensures Firebase Admin is initialized only once.
+const initializeFirebaseAdmin = () => {
+  if (admin.apps.length > 0) {
+    return;
+  }
 
-if (!admin.apps.length) {
+  const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+
+  if (!credentialsJson) {
+    console.error("Firebase Admin SDK Error: GOOGLE_APPLICATION_CREDENTIALS_JSON is not set.");
+    throw new Error("Sunucu yapılandırma hatası: Firebase Admin kimlik bilgileri eksik.");
+  }
+
   try {
-    const serviceAccount = JSON.parse(process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON as string);
+    const serviceAccount = JSON.parse(credentialsJson);
 
-    // Explicitly replace escaped newlines in the private key to fix parsing errors
+    // The crucial fix for Vercel environments where the private key newlines are double-escaped.
     if (serviceAccount.private_key) {
       serviceAccount.private_key = serviceAccount.private_key.replace(/\\n/g, '\n');
     }
@@ -20,11 +24,17 @@ if (!admin.apps.length) {
     admin.initializeApp({
       credential: admin.credential.cert(serviceAccount),
     });
-  } catch (error) {
-    console.error("Failed to parse GOOGLE_APPLICATION_CREDENTIALS_JSON. Make sure it's a valid JSON string.", error);
-    throw new Error("Invalid Firebase Admin credentials format.");
+     console.log("Firebase Admin SDK successfully initialized.");
+  } catch (error: any) {
+    console.error("Firebase Admin SDK Initialization Error:", error.message);
+    // Throw a more descriptive error to aid in debugging.
+    throw new Error(`Firebase Admin kimlik bilgileri ayrıştırılamadı: ${error.message}`);
   }
-}
+};
 
+// Run the initialization function.
+initializeFirebaseAdmin();
+
+// Export the initialized services.
 export const adminAuth = admin.auth();
 export const adminDb = admin.firestore();

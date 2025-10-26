@@ -8,23 +8,31 @@ async function recordUserActivity(uid: string, request: NextRequest) {
     const uaString = request.headers.get('user-agent');
     const ipAddress = request.headers.get('x-forwarded-for') || request.ip || 'Unknown';
 
-    const parser = new UAParser(uaString || undefined);
+    if (!uaString || ipAddress === 'Unknown') {
+        // Don't record if essential information is missing
+        return;
+    }
+
+    const parser = new UAParser(uaString);
     const result = parser.getResult();
 
-    const deviceId = `${uid}-${result.os.name || 'UnknownOS'}-${result.browser.name || 'UnknownBrowser'}`.replace(/\s+/g, '_');
+    // Create a more stable device ID
+    const deviceSignature = `${result.os.name || 'UnknownOS'}-${result.browser.name || 'UnknownBrowser'}-${result.device.vendor || 'UnknownVendor'}-${result.device.model || 'UnknownModel'}`;
+    const deviceId = `${uid}-${Buffer.from(deviceSignature).toString('base64')}`;
 
     const deviceRef = adminDb.collection('devices').doc(deviceId);
-    const loginHistoryRef = adminDb.collection('loginHistory').doc();
+    const loginHistoryRef = adminDb.collection('loginHistory').doc(); // New doc for each login
 
     const now = new Date();
 
     const deviceData = {
       userId: uid,
-      deviceName: `${result.os.name || ''} on ${result.browser.name || ''}`,
+      deviceName: `${result.os.name || 'OS'} on ${result.browser.name || 'Browser'}`,
       deviceType: result.device.type || 'desktop',
       os: result.os.name,
       browser: result.browser.name,
       ipAddress: ipAddress,
+      lastSeen: now, // Always update lastSeen
     };
 
     const loginData = {
@@ -37,19 +45,16 @@ async function recordUserActivity(uid: string, request: NextRequest) {
 
     const batch = adminDb.batch();
 
-    const deviceDoc = await deviceRef.get();
-    if (!deviceDoc.exists) {
-      batch.set(deviceRef, { ...deviceData, firstSeen: now, lastSeen: now });
-    } else {
-      batch.update(deviceRef, { lastSeen: now, ipAddress: ipAddress });
-    }
+    // Use set with merge:true to create or update the device, which is simpler and safer
+    batch.set(deviceRef, deviceData, { merge: true });
 
+    // Always create a new login history record
     batch.set(loginHistoryRef, loginData);
 
     await batch.commit();
 
   } catch (error) {
-    console.error("Kullanıcı aktivitesi kaydedilirken HATA oluştu:", error);
+    console.error("Kullanıcı aktivitesi kaydedilirken bir HATA oluştu:", error);
   }
 }
 
@@ -96,7 +101,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 
-  await recordUserActivity(uid, request);
+  // Intentionally call this without awaiting to not block the main response
+  recordUserActivity(uid, request);
 
   try {
     body = await request.json();

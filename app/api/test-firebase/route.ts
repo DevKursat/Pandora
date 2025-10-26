@@ -1,52 +1,53 @@
 import { NextResponse } from 'next/server';
 import admin from 'firebase-admin';
 
-// Kullanıcı tarafından sağlanan ve soruna neden olabilecek servis hesabı bilgileri
+// Kullanıcı tarafından sağlanan YENİ servis hesabı bilgileri
 const serviceAccount = {
-  projectId: "pandora-43736",
-  clientEmail: "firebase-adminsdk-fbsvc@pandora-43736.iam.gserviceaccount.com",
+  projectId: "pandora-7c682",
+  clientEmail: "firebase-adminsdk-fbsvc@pandora-7c682.iam.gserviceaccount.com",
   privateKey: `-----BEGIN PRIVATE KEY-----
-MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC1zSKfgxMolojW
-9DNoZmFS+0YaOuknvZkHPPvs6D8txZ8x9BeSopg13U16Fol2PnbwMgnqvSCek18l
-LNhpsGfp8lsfXSgR1X8FegmmZ9qfmASP1Ac3J2FIX+3s8ozWR3XSfUBKt1izOawd
-7J+Mou1sSNRzhCVQKdDJZhytdBieDhVpK9FrzuPV8wzvbo6xCW4cYJEtI1apLH9a
-aIxFKqVogbwk08czzwT7xPuGXTOChOjOeQ6S5E3202LMAspMYrsdoYOOcU8SD7kZ
-IZ58NE8zA5qbHT19tBSZknfTBDpPBAL76KWrczD4KPZXmXX+eJuKy6eXX+0e5Go5
-n8K5THLdAgMBAAECggEASW6/7u1LRkgzopuFzkQYSKPdJ4gnGBnBn4ZW/dS7fDoI
-OO2uvdh2Ib+vZUKIKJ5HfXLAxbO54sOFGWd5TItoFbuCafM/VaDGS0iFcFUfnfoR
-0aSje3gpF8pDuMMp9v1rTmewGd3f8pi3eGjU80H2I5hxU+2LAsu5HThlGfy8Ws6H
-UVRT9Pu3/vrgh2Q5p+Qb//2NhcG7k2edTRbF/Xs7QsaZIpovQqXv40B8VVLXi6mo
-CFlfBxJRqnotDm7Qig91kX+5K618SxJZto5tuK0ow1HJHiJmURMsJLWGAPyG9rVl
-1D7+spU6DPwLiquIVM5T+mUJ2TLMRl6EwH0ZHJsa8wKBgQDu24t4/2pmhQ6B+9dp
-DbvjpPqAl4CJTz2UqLKonWAbWGltmE2zpAcdfoqesWCNVy0vzTFWWgX8Wy2WqLcd
-bYwVGszRGN/DUjfy6nGTpEQmFSMHKT8TqAfT6ZJfx8M0ps+uEOwV2p40ViahUqzW
-93UhsBnFtHsIT8V2c87vdPxouwKBgQDC2VAzbf8GHyl4njMn0ocPE3NgYUQmqhjr
-eICWiIm0Pe0Wx8r3r+8uiKGMi2trYW8obUPWhq0Y2OsbiK4yVBKOxcf/a5Y3l/43
-suj2PSiSIwCWOxKyD/Qzf2mq8WdZDjkJQxRSzBbVeUyOGVL3j2JvebJgyLHO431U
-BCeusKNFRwKBgQCvB4I0sDWv2mC/L2SyPrYoIoTOJjayZ7agcN46YNhEMY1QGgMW
-WGQ+YLQDhcdSy0b5eEtnE6C/Q7EsbYWBsvyrmm/r6WZPIriM8O85WW322hZI8Rif
-tsnFp6rzNNb+hh45V30opoK3p0m3fXXaMItMnFbGYXKmrI3uNv60ye0McQKBgFcd
-e+sSkcO16P/Bk1OJn9LQunPr6OF0iWG15Z/n+dE5IqhduVRWN5TRh5DjwKoozN8B
-QyRF4FxMl4ke6eschZOJv+pluqqubP2QIvH81AfKWHfSf4BW+7KOk7rW5YL+heer
-Mwn1r3vQGLcrgVmnpLX8bhExibXbJeyLUwaaeNT/AoGBANxlxBY1ldQN5g1bhyH7
-3tCm8/eWyg7kFTZuZCktMeuNrBTlQ9Fg1y9vR555WwRVrJCeF4wjw+q1/29pHZ4t
-zbBY9pmUzA08E1ylnPTzc6JSgz81zT6SNPKi/1gKmYsvPcu3WD+Twpeq9KfFH13y
-YvG+e5wlyEyNZ3S6u6GT/O3B
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCmbrRcBqeOXiUP
+wO0NW50VuYsRLYwsYpGkVA9Pe2EHtscq60yVQcS4Ru2fMp2X6fBQ9JCJj+fDPHa+
+Hhih7TyruNbviAilPa39r0TAYDhjqldLQihhcavGO8Matm3T6V1UvecIWvRC9jWU
+19n+7fwA70Ip6vPoCtAjLp60Q3BiGMC0PZvS1e7fkt7QhG6tQSHl8ibw8xCMQ4+e
+fzaWQlPxi/feIu7XUycJ0wwdRGkEZR4K3G/7vsa+ckGzjpaxT9hfwWNFjnoqzkiF
+wjHjRITXZrhvfWGoPjS9bbdrenp2L8Bq7YwY0XsDKlOaNOmXwYDich4nsCHh1Y/1
+L6YFwO/DAgMBAAECggEACV7Sl8XQzugHtScwZt/2wao0ernyRO4jHg8/h22Tt8qi
+KbfyvrU5Eq5STZ7HbFisV5qAEsaqjqhLqoY+Q8umw/0AWPRzQX5uBTTw2CtIBtB9
+4WEEWKwnjDMsLR0CpPuOw358+1BHpVzVr8oms2mJwTG3VhiCNVklK9NBoIuVexMA
+xCBwop8DBXfcgVzwMheQ+BKwAB+hmLoS4Ar9y6Iu3LNTS+Yj9GOnB05NVonjyr00
+PA1MauvYCrckE82BjzCwcb5qXIV0ZNFcY0tdDvUCLVDgOT1C4uaxjmd0jUkGPj6I
+lFQ+yLiWBn1uE4KmTTl8vgof6TobZdsRNMqFAAM+RQKBgQDXdK4GZvOQi7TJWdP5
+yPDORt4jgTXj5lTpdx5kfioPYXK1V4O+JsfXVB6ydyna3Y8HMilHTj0nGTk81kan
+aAboxVDuDUqt8Cjaz/effuYJ4wA+jCsxlQHrZBK2qGQaPBvvQa5jOLNCd199fAyx
+8tbRzZW/Otl/1TK5u9YRYIJznQKBgQDFwGKJugfJ+716JyM90FBwI261/KzJFh6A
+omXcp4EfycB6HkRzl8Sl3vB+FZTQdVQJ4Lj0R96wCb3NoWCV7z9RSH0CInUn5Uef
+04a3jrKbCCt9LO8guChI8vkiXCJOp7aJWdkPNQ89qdBTClJp0IZow18zkrOBr65c
+cvoyp+MC3wKBgFpP5255kxkA5qwMAkXOy9m7bPv2+m7oKqmeK9g15k2CLIIFCA0Z
+1mTVNvTZ7Gp4uq5qgVEJY6rS8OImc4FSoqrJou3WFnqok4d86zApEiYMyBpvyN9E
+tYRE828rUKKKla8Jmh6vMrzmqtk/uVaSEyfohB+ffHIQHO4r5URtbuElAoGAUPaD
+YYAY0EmROgHsG9K+HCtlmHzrASldM61Jpx2tcCZZ96WMwQbSLFcqf3S2iOKAlcq7
+7se+FLToUNhRgxGBCvZyt/0DmmH1ASrJbT2vQmoF5CoRfYPoenWAKuEt6qYfxfxT
+Mja3Frf/4v/G3ivR2/Khd6wIcoBLEu7AIR07hGECgYEAkudcD/d/mfPTrJv+xqDG
+siaEH9vEexqFpUnTL8Ju7iv83Ro+ha0i3t3MqIJkV2FgIowXOFqPrL9aeg2jzaOP
+Pn7k2DuccHkPUsvkUYBLkLUs5hiEcQ3BUmd1xHmhCyTwqaEI1ddm6FUYyvh/qpjd
+tF9KCK/c3xLbZvBW3KdhEMs=
 -----END PRIVATE KEY-----`.replace(/\\n/g, '\n'),
 };
 
 export async function GET() {
   try {
     // Firebase'in zaten başlatılıp başlatılmadığını kontrol et
-    if (!admin.apps.length) {
-      console.log('Firebase Admin SDK başlatılıyor...');
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount as any),
-      });
-      console.log('Firebase Admin SDK başarıyla başlatıldı.');
-    } else {
-      console.log('Firebase Admin SDK zaten başlatılmış.');
+    if (admin.apps.length > 0) {
+        // Mevcut app'i silerek yeniden başlatmayı garantile
+        await admin.app().delete();
     }
+
+    console.log('Firebase Admin SDK (Yeni Proje) başlatılıyor...');
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount as any),
+    });
+    console.log('Firebase Admin SDK (Yeni Proje) başarıyla başlatıldı.');
 
     // Firestore'a erişerek bağlantıyı doğrula
     const db = admin.firestore();
@@ -57,15 +58,15 @@ export async function GET() {
 
     return NextResponse.json({
       status: 'success',
-      message: 'Firebase Admin SDK başarıyla başlatıldı ve Firestore bağlantısı doğrulandı.',
+      message: 'YENİ PROJE: Firebase Admin SDK başarıyla başlatıldı ve Firestore bağlantısı doğrulandı.',
       collections: collectionIds,
     });
   } catch (error: any) {
-    console.error('TEST API HATASI: Firebase işlemi başarısız oldu.', error);
+    console.error('YENİ PROJE TEST API HATASI: Firebase işlemi başarısız oldu.', error);
     return NextResponse.json(
       {
         status: 'error',
-        message: 'Firebase Admin SDK başlatılamadı veya Firestore ile iletişim kurulamadı.',
+        message: 'YENİ PROJE: Firebase Admin SDK başlatılamadı veya Firestore ile iletişim kurulamadı.',
         errorName: error.name,
         errorMessage: error.message,
         errorCode: error.code,

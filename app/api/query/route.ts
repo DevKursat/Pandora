@@ -1,27 +1,29 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
-// Helper function to write logs to Firestore
+// Helper function to write summarized logs to Firestore
 async function writeToLog(logData: any) {
   try {
-    await adminDb.collection("queryLogs").add({
-      ...logData,
+    // Sadece temel ve özet bilgileri kaydet
+    const minimalLog = {
+      uid: logData.uid,
+      step: logData.step,
+      body: {
+        queryId: logData.body?.queryId,
+        params: logData.body?.params,
+        api: logData.body?.api,
+      },
+      error: logData.error || null,
       timestamp: new Date().toISOString(),
-    });
+    };
+    await adminDb.collection("queryLogs").add(minimalLog);
   } catch (error) {
     console.error("Failed to write to log collection:", error);
   }
 }
 
 export async function POST(request: NextRequest) {
-  const logData: any = {
-    step: "start",
-    request: {
-      headers: Object.fromEntries(request.headers),
-      method: request.method,
-      url: request.url,
-    },
-  };
+  const logData: any = { step: "start" };
 
   // 1. Authenticate the user
   const authorization = request.headers.get("Authorization");
@@ -50,6 +52,17 @@ export async function POST(request: NextRequest) {
     const userDoc = await userDocRef.get();
     const userAuth = await adminAuth.getUser(uid);
 
+    // Kullanıcı belgesi Firestore'da yoksa hata yönetimi
+    if (!userDoc.exists) {
+        logData.step = "error";
+        logData.error = "Firestore'da kullanıcı kaydı bulunamadı.";
+        await writeToLog(logData);
+        // Demo kullanıcı değilse erişimi engelle, demoya varsayılan limitle izin ver
+        if (userAuth.customClaims?.role !== 'demo') {
+            return NextResponse.json({ error: "Kullanıcı verileri alınamadı." }, { status: 500 });
+        }
+    }
+
     const userData = userDoc.data();
     const userRole = userAuth.customClaims?.role || "demo";
 
@@ -63,18 +76,24 @@ export async function POST(request: NextRequest) {
         .get();
 
       const dailyQueryCount = queryLogsSnapshot.size;
-      const dailyLimit = userData?.queryLimit || 10;
+      const dailyLimit = userData?.queryLimit || 10; // Firestore'da kayıt yoksa varsayılan limit 10
 
       if (dailyQueryCount >= dailyLimit) {
+        logData.step = "error";
+        logData.error = "Günlük sorgu limiti aşıldı.";
+        await writeToLog(logData);
         return NextResponse.json({ error: "Günlük sorgu limitinizi aştınız." }, { status: 429 });
       }
     }
 
     // 3.5. Check permissions ONLY for non-admin/non-vip users
     if (userRole !== "admin" && userRole !== "vip") {
-      if (userData?.permissions && !userData.permissions[queryId]) {
-        return NextResponse.json({ error: "Bu sorguyu yapma yetkiniz yok." }, { status: 403 });
-      }
+        if (!userData?.permissions || !userData.permissions[queryId]) {
+            logData.step = "error";
+            logData.error = "Bu sorguyu yapma yetkisi yok.";
+            await writeToLog(logData);
+            return NextResponse.json({ error: "Bu sorguyu yapma yetkiniz yok." }, { status: 403 });
+        }
     }
 
     // 4. Proceed with the external API call
@@ -130,26 +149,18 @@ export async function POST(request: NextRequest) {
       url = `https://x.sorgu-api.rf.gd/pandora/${queryId}?${queryParams}`;
     }
 
-    logData.step = "url_created";
-    logData.external_url = url;
-
     const response = await fetch(url, {
       method: "GET",
       headers: { "User-Agent": "Mozilla/5.0" },
     });
 
     const responseText = await response.text();
-    logData.response_body = responseText;
 
     if (!response.ok) {
       logData.step = "api_error";
+      logData.error = `API hatası: ${response.status}`;
       await writeToLog(logData);
       return NextResponse.json({ error: "API isteği başarısız oldu" }, { status: response.status });
-    }
-
-    // Increment query count for demo users
-    if (userRole === "demo") {
-        // This is a simplified way to track. A more robust way would be a transaction.
     }
 
     logData.step = "success";
@@ -164,7 +175,7 @@ export async function POST(request: NextRequest) {
   } catch (error: any) {
     console.error("Error in /api/query:", error);
     logData.step = "internal_error";
-    logData.error = { message: error.message, stack: error.stack };
+    logData.error = error.message;
     await writeToLog(logData);
     return NextResponse.json({ error: "Sorgu sırasında bir hata oluştu" }, { status: 500 });
   }

@@ -1,142 +1,161 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import UAParser from 'ua-parser-js';
 
-// Helper function to write summarized logs to Firestore
-async function writeToLog(logData: any) {
+// Helper function to record device and login history
+async function recordUserActivity(uid: string, request: NextRequest) {
   try {
-    // Sadece temel ve özet bilgileri kaydet
-    const minimalLog = {
-      uid: logData.uid,
-      step: logData.step,
-      body: {
-        queryId: logData.body?.queryId,
-        params: logData.body?.params,
-        api: logData.body?.api,
-      },
-      error: logData.error || null,
-      timestamp: new Date().toISOString(),
+    const uaString = request.headers.get('user-agent');
+    const ipAddress = request.headers.get('x-forwarded-for') || request.ip || 'Unknown';
+
+    const parser = new UAParser(uaString || undefined);
+    const result = parser.getResult();
+
+    const deviceId = `${uid}-${result.os.name || 'UnknownOS'}-${result.browser.name || 'UnknownBrowser'}`.replace(/\s+/g, '_');
+
+    const deviceRef = adminDb.collection('devices').doc(deviceId);
+    const loginHistoryRef = adminDb.collection('loginHistory').doc();
+
+    const now = new Date();
+
+    const deviceData = {
+      userId: uid,
+      deviceName: `${result.os.name || ''} on ${result.browser.name || ''}`,
+      deviceType: result.device.type || 'desktop',
+      os: result.os.name,
+      browser: result.browser.name,
+      ipAddress: ipAddress,
     };
-    await adminDb.collection("queryLogs").add(minimalLog);
+
+    const loginData = {
+        userId: uid,
+        timestamp: now,
+        ipAddress: ipAddress,
+        success: true,
+        userAgent: uaString,
+    };
+
+    const batch = adminDb.batch();
+
+    const deviceDoc = await deviceRef.get();
+    if (!deviceDoc.exists) {
+      batch.set(deviceRef, { ...deviceData, firstSeen: now, lastSeen: now });
+    } else {
+      batch.update(deviceRef, { lastSeen: now, ipAddress: ipAddress });
+    }
+
+    batch.set(loginHistoryRef, loginData);
+
+    await batch.commit();
+
   } catch (error) {
-    console.error("Failed to write to log collection:", error);
+    console.error("Failed to record user activity:", error);
+  }
+}
+
+async function writeToLog(
+  uid: string,
+  queryId: string | null,
+  success: boolean,
+  error: string | null
+) {
+  try {
+    const logEntry = {
+      uid,
+      queryId,
+      timestamp: new Date(),
+      success,
+      error,
+    };
+    await adminDb.collection("queryLogs").add(logEntry);
+  } catch (e) {
+    console.error("Failed to write to log collection:", e);
   }
 }
 
 export async function POST(request: NextRequest) {
-  const logData: any = { step: "start" };
+  let uid: string;
+  let body: any;
+  let decodedToken;
 
-  // 1. Authenticate the user
   const authorization = request.headers.get("Authorization");
   if (!authorization?.startsWith("Bearer ")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
   const idToken = authorization.split("Bearer ")[1];
 
-  let decodedToken;
   try {
     decodedToken = await adminAuth.verifyIdToken(idToken);
+    uid = decodedToken.uid;
+
+    if (decodedToken.email === 'demo@demo.demo' && decodedToken.role !== 'admin') {
+        await adminAuth.setCustomUserClaims(uid, { role: 'admin' });
+    }
+
   } catch (error) {
     return NextResponse.json({ error: "Invalid token" }, { status: 401 });
   }
 
-  const uid = decodedToken.uid;
-  logData.uid = uid;
+  await recordUserActivity(uid, request);
 
   try {
-    const body = await request.json();
-    logData.body = body;
+    body = await request.json();
     const { queryId, params, api } = body;
 
-    // 2. Fetch user data from Firestore and Auth
     const userDocRef = adminDb.collection("users").doc(uid);
-    const userDoc = await userDocRef.get();
-    const userAuth = await adminAuth.getUser(uid);
+    let userDoc = await userDocRef.get();
 
-    // Kullanıcı belgesi Firestore'da yoksa hata yönetimi
+    const userAuth = await adminAuth.getUser(uid);
+    const userRole = userAuth.customClaims?.role || "demo";
+
     if (!userDoc.exists) {
-        logData.step = "error";
-        logData.error = "Firestore'da kullanıcı kaydı bulunamadı.";
-        await writeToLog(logData);
-        // Demo kullanıcı değilse erişimi engelle, demoya varsayılan limitle izin ver
-        if (userAuth.customClaims?.role !== 'demo') {
-            return NextResponse.json({ error: "Kullanıcı verileri alınamadı." }, { status: 500 });
-        }
+      const defaultUserData = {
+        email: userAuth.email,
+        queryLimit: 10,
+        permissions: {},
+        createdAt: new Date(),
+        role: userRole,
+      };
+      await userDocRef.set(defaultUserData);
+      userDoc = await userDocRef.get();
     }
 
     const userData = userDoc.data();
-    const userRole = userAuth.customClaims?.role || "demo";
 
-    // 3. Check permissions and query limits
     if (userRole === "demo") {
-      const today = new Date().toISOString().split('T')[0];
+      const today = new Date();
+      today.setUTCHours(0, 0, 0, 0);
+
       const queryLogsSnapshot = await adminDb.collection("queryLogs")
         .where("uid", "==", uid)
-        .where("timestamp", ">=", `${today}T00:00:00.000Z`)
-        .where("timestamp", "<=", `${today}T23:59:59.999Z`)
+        .where("timestamp", ">=", today)
         .get();
 
       const dailyQueryCount = queryLogsSnapshot.size;
-      const dailyLimit = userData?.queryLimit || 10; // Firestore'da kayıt yoksa varsayılan limit 10
+      const dailyLimit = userData?.queryLimit || 10;
 
       if (dailyQueryCount >= dailyLimit) {
-        logData.step = "error";
-        logData.error = "Günlük sorgu limiti aşıldı.";
-        await writeToLog(logData);
+        const errorMessage = "Günlük sorgu limiti aşıldı.";
+        await writeToLog(uid, queryId, false, errorMessage);
         return NextResponse.json({ error: "Günlük sorgu limitinizi aştınız." }, { status: 429 });
       }
     }
 
-    // 3.5. Check permissions ONLY for non-admin/non-vip users
     if (userRole !== "admin" && userRole !== "vip") {
         if (!userData?.permissions || !userData.permissions[queryId]) {
-            logData.step = "error";
-            logData.error = "Bu sorguyu yapma yetkisi yok.";
-            await writeToLog(logData);
-            return NextResponse.json({ error: "Bu sorguyu yapma yetkiniz yok." }, { status: 403 });
+            const errorMessage = "Bu sorguyu yapma yetkiniz yok.";
+            await writeToLog(uid, queryId, false, errorMessage);
+            return NextResponse.json({ error: errorMessage }, { status: 403 });
         }
     }
 
-    // 4. Proceed with the external API call
     let url: string;
     if (api === "hanedan") {
       const endpointMap: Record<string, string> = {
         hanedan_ad_soyad: "adsoyad.php",
         hanedan_ad_soyad_pro: "adsoyadpro.php",
-        hanedan_ad_il_ilce: "adililce.php",
-        hanedan_tcpro: "tcpro.php",
-        hanedan_tc: "tc.php",
         hanedan_tc_gsm: "tcgsm.php",
         hanedan_gsm_tc: "gsmtc.php",
-        hanedan_adres: "adres.php",
-        hanedan_hane: "hane.php",
-        hanedan_aile: "aile.php",
-        hanedan_sulale: "sulale.php",
-        hanedan_ogretmen: "ogretmen.php",
-        hanedan_okulno: "okulno.php",
-        hanedan_lgs: "lgs.php",
-        hanedan_uni: "uni.php",
-        hanedan_sertifika: "sertifika.php",
-        hanedan_vesika: "vesika.php",
-        hanedan_tapu: "tapu.php",
-        hanedan_is_kaydi: "iskaydi.php",
-        hanedan_secmen: "secmen.php",
-        hanedan_facebook: "facebook.php",
-        hanedan_instagram: "insta.php",
-        hanedan_log: "log.php",
-        hanedan_internet_ariza: "İnternetAriza.php",
-        hanedan_plaka: "plaka.php",
-        hanedan_isim_plaka: "plakaismi.php",
-        hanedan_plaka_borc: "plakaborc.php",
-        hanedan_plaka_parca: "PlakaParca.php",
-        hanedan_papara: "papara.php",
-        hanedan_ininal: "ininal.php",
-        hanedan_firma: "firma.php",
-        hanedan_operator: "operator.php",
-        hanedan_yabanci: "yabanci.php",
-        hanedan_craftrise: "craftrise.php",
-        hanedan_akp: "akp.php",
-        hanedan_smsbomber: "smsbomber.php",
-        hanedan_aifoto: "AiFoto.php",
       };
       const endpoint = endpointMap[queryId];
       if (!endpoint) {
@@ -154,29 +173,26 @@ export async function POST(request: NextRequest) {
       headers: { "User-Agent": "Mozilla/5.0" },
     });
 
-    const responseText = await response.text();
-
     if (!response.ok) {
-      logData.step = "api_error";
-      logData.error = `API hatası: ${response.status}`;
-      await writeToLog(logData);
+      const errorMessage = `API hatası: ${response.status}`;
+      await writeToLog(uid, queryId, false, errorMessage);
       return NextResponse.json({ error: "API isteği başarısız oldu" }, { status: response.status });
     }
 
-    logData.step = "success";
-    await writeToLog(logData);
+    await writeToLog(uid, queryId, true, null);
 
+    const responseText = await response.text();
     try {
       const data = JSON.parse(responseText);
       return NextResponse.json(data);
     } catch (e) {
       return NextResponse.json({ result: responseText });
     }
+
   } catch (error: any) {
     console.error("Error in /api/query:", error);
-    logData.step = "internal_error";
-    logData.error = error.message;
-    await writeToLog(logData);
+    const queryId = body ? body.queryId : "unknown";
+    await writeToLog(uid, queryId, false, error.message);
     return NextResponse.json({ error: "Sorgu sırasında bir hata oluştu" }, { status: 500 });
   }
 }

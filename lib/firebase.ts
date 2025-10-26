@@ -1,27 +1,20 @@
-import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { getAnalytics, Analytics } from "firebase/analytics";
-import { Auth, getAuth } from "firebase/auth";
+import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBZ3jiAeOyQDi9GBgIePFP8pPU035oh6ag",
-  authDomain: "pandora-43736.firebaseapp.com",
-  projectId: "pandora-43736",
-  storageBucket: "pandora-43736.firebasestorage.app",
-  messagingSenderId: "212691894027",
-  appId: "1:212691894027:web:65917e617ed57257afac0e",
-  measurementId: "G-07TTGE58C4"
+  apiKey: "AIzaSyDi4wnt7fiBVKn6dcDMxs9LtwYyVayxjV0",
+  authDomain: "pandora-31.firebaseapp.com",
+  projectId: "pandora-31",
+  storageBucket: "pandora-31.appspot.com",
+  messagingSenderId: "68280231637",
+  appId: "1:68280231637:web:376ef3976af75aa7a0e45c",
+  measurementId: "G-6XTLED3NJR"
 };
 
 // Initialize Firebase
-const app: FirebaseApp = !getApps().length ? initializeApp(firebaseConfig) : getApp();
-const auth: Auth = getAuth(app);
-let analytics: Analytics | null = null;
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-// Initialize Analytics only on the client side
-if (typeof window !== 'undefined') {
-  if ("measurementId" in firebaseConfig) {
-    analytics = getAnalytics(app);
-  }
-}
-
-export { app, auth, analytics };
+export { app, auth, db };

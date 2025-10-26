@@ -1,21 +1,17 @@
-import { NextResponse } from 'next/server';
-import { adminDb } from '@/lib/firebase-admin';
+import { NextResponse } from "next/server";
+import { adminDb } from "@/lib/firebase-admin";
 
-export const revalidate = 0; // Don't cache this response
+export const dynamic = 'force-dynamic';
 
+// This endpoint is public and used by the middleware to check maintenance status.
 export async function GET() {
   try {
-    const maintenanceRef = adminDb.collection('settings').doc('maintenance');
-    const doc = await maintenanceRef.get();
-
-    if (doc.exists) {
-      return NextResponse.json({ isEnabled: doc.data()?.enabled || false });
-    }
-    // If the document doesn't exist, assume maintenance is off
-    return NextResponse.json({ isEnabled: false });
+    const settingsDoc = await adminDb.collection('settings').doc('maintenance').get();
+    const isEnabled = settingsDoc.exists ? settingsDoc.data()?.isEnabled || false : false;
+    return NextResponse.json({ isEnabled });
   } catch (error) {
-    console.error('Error fetching maintenance status:', error);
-    // In case of error, fail open (assume maintenance is off) to not lock out users
-    return NextResponse.json({ isEnabled: false, error: 'Failed to fetch status' }, { status: 500 });
+    console.error("Error fetching maintenance status in API:", error);
+    // Fail-safe: If the database check fails, assume maintenance is off to prevent locking everyone out.
+    return NextResponse.json({ isEnabled: false });
   }
 }

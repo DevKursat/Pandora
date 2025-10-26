@@ -33,13 +33,20 @@ export async function GET(request: NextRequest) {
         listUsersResult.users.map(async (userRecord) => {
           const customClaims = (userRecord.customClaims || {}) as { role?: string; vipExpiry?: string };
 
-          // For each user, fetch their devices from Firestore
-          const devicesSnapshot = await adminDb.collection('devices').where('userId', '==', userRecord.uid).get();
+          let deviceCount = 0;
+          let uniqueIPs = new Set<string>();
 
-          const uniqueIPs = new Set<string>();
-          devicesSnapshot.forEach(doc => {
-            uniqueIPs.add(doc.data().ipAddress);
-          });
+          // Check if 'devices' collection exists before querying to avoid errors on a fresh DB
+          const collections = await adminDb.listCollections();
+          if (collections.map(c => c.id).includes('devices')) {
+            const devicesSnapshot = await adminDb.collection('devices').where('userId', '==', userRecord.uid).get();
+            if (!devicesSnapshot.empty) {
+                deviceCount = devicesSnapshot.size;
+                devicesSnapshot.forEach(doc => {
+                    uniqueIPs.add(doc.data().ipAddress);
+                });
+            }
+          }
 
           return {
             uid: userRecord.uid,
@@ -48,7 +55,7 @@ export async function GET(request: NextRequest) {
             createdAt: userRecord.metadata.creationTime,
             lastLogin: userRecord.metadata.lastSignInTime,
             vipExpiryDate: customClaims.vipExpiry,
-            deviceCount: devicesSnapshot.size,
+            deviceCount: deviceCount,
             uniqueIPs: uniqueIPs.size,
           };
         })

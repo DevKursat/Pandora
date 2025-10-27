@@ -1,6 +1,6 @@
 import { type NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import UAParser from 'ua-parser-js';
+import { UAParser } from 'ua-parser-js';
 
 // Helper function to record device and login history
 async function recordUserActivity(uid: string, request: NextRequest) {

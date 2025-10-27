@@ -90,6 +90,7 @@ export default function AdminPanel() {
   });
 
   const [notification, setNotification] = useState({ message: "", recipients: "all" })
+  const [isSendingNotification, setIsSendingNotification] = useState(false);
   const [maintenanceMode, setMaintenanceMode] = useState(false)
   const [disabledQueries, setDisabledQueries] = useState<string[]>([])
 
@@ -258,7 +259,7 @@ export default function AdminPanel() {
       alert("Bildirim mesajı boş olamaz!")
       return
     }
-
+    setIsSendingNotification(true);
     try {
         const headers = await getAuthHeader();
       const response = await fetch("/api/admin/notifications", {
@@ -270,9 +271,14 @@ export default function AdminPanel() {
       if (response.ok) {
         alert("Bildirim gönderildi!")
         setNotification({ message: "", recipients: "all" })
+      } else {
+        alert("Bildirim gönderilemedi. Lütfen tekrar deneyin.")
       }
     } catch (error) {
       console.error("Failed to send notification:", error)
+      alert("Bildirim gönderilirken bir hata oluştu.")
+    } finally {
+        setIsSendingNotification(false);
     }
   }
 
@@ -865,9 +871,11 @@ export default function AdminPanel() {
                     placeholder="Kullanıcılara gönderilecek bildirim mesajını yazın..."
                   />
                 </div>
-                <Button onClick={handleSendNotification} className="w-full bg-primary hover:bg-primary/90">
-                  <Bell className="mr-2 h-4 w-4" />
-                  Bildirim Gönder
+                <Button onClick={handleSendNotification} className="w-full bg-primary hover:bg-primary/90" disabled={isSendingNotification}>
+                  {isSendingNotification ? "Gönderiliyor..." : <>
+                    <Bell className="mr-2 h-4 w-4" />
+                    Bildirim Gönder
+                  </>}
                 </Button>
               </div>
             </Card>

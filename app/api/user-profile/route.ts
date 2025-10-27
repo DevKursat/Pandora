@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
       // Get query logs
       const queryLogsSnapshot = await adminDb.collection("queryLogs").where("uid", "==", uid).get();
       const totalQueries = queryLogsSnapshot.size;
-      const successfulQueries = queryLogsSnapshot.docs.filter(doc => doc.data().step === 'success').length;
+      const successfulQueries = queryLogsSnapshot.docs.filter(doc => doc.data().success === true).length;
 
       // Get VIP expiry
       const customClaims = (userRecord.customClaims || {}) as { vipExpiry?: string };
@@ -45,12 +45,17 @@ export async function GET(request: NextRequest) {
         vipDaysRemaining = Math.max(0, Math.ceil(remainingTime / (1000 * 60 * 60 * 24)));
       }
 
+      const userDoc = await adminDb.collection("users").doc(uid).get();
+      const userData = userDoc.data();
+      const queryLimit = userData?.queryLimit || 10;
+
       const stats = {
         totalQueries,
         successfulQueries,
         failedQueries: totalQueries - successfulQueries,
         accountAge,
         vipDaysRemaining,
+        queryLimit,
       };
 
       return NextResponse.json(stats);

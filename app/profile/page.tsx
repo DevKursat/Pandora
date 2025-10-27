@@ -234,6 +234,37 @@ export default function ProfilePage() {
 
           <TabsContent value="activity" className="space-y-4 md:space-y-6">
             <Card className="p-4 md:p-6 bg-slate-900/50 border-slate-800 backdrop-blur-sm">
+                <h3 className="text-base md:text-lg font-semibold text-foreground mb-4 md:mb-6 flex items-center gap-2">
+                    <Database className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+                    <span className="text-sm md:text-base">Sorgu Hakkı ve Kullanım</span>
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6">
+                    <div className="p-3 md:p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+                        <div className="flex items-center gap-2 md:gap-3 mb-2">
+                            <TrendingUp className="h-4 w-4 md:h-5 md:w-5 text-primary" />
+                            <p className="text-xs md:text-sm text-muted-foreground">Kalan Sorgu Hakkı</p>
+                        </div>
+                        <p className="text-xl md:text-2xl font-bold text-foreground">
+                            {isVip ? "Sınırsız" : `${stats.totalQueries}/${stats.queryLimit || 10}`}
+                        </p>
+                    </div>
+                    <div className="p-3 md:p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+                        <div className="flex items-center gap-2 md:gap-3 mb-2">
+                            <CheckCircle2 className="h-4 w-4 md:h-5 md:w-5 text-green-500" />
+                            <p className="text-xs md:text-sm text-muted-foreground">Toplam Başarılı</p>
+                        </div>
+                        <p className="text-xl md:text-2xl font-bold text-foreground">{stats.successfulQueries}</p>
+                    </div>
+                    <div className="p-3 md:p-4 rounded-lg bg-slate-800/50 border border-slate-700">
+                        <div className="flex items-center gap-2 md:gap-3 mb-2">
+                            <XCircle className="h-4 w-4 md:h-5 md:w-5 text-red-500" />
+                            <p className="text-xs md:text-sm text-muted-foreground">Toplam Hatalı</p>
+                        </div>
+                        <p className="text-xl md:text-2xl font-bold text-foreground">{stats.failedQueries}</p>
+                    </div>
+                </div>
+            </Card>
+            <Card className="p-4 md:p-6 bg-slate-900/50 border-slate-800 backdrop-blur-sm">
               <h3 className="text-base md:text-lg font-semibold text-foreground mb-4 md:mb-6 flex items-center gap-2">
                 <Clock className="h-4 w-4 md:h-5 md:w-5 text-primary" />
                 <span className="text-sm md:text-base">Son Aktiviteler</span>
@@ -243,16 +274,16 @@ export default function ProfilePage() {
                   <div key={index} className="p-3 md:p-4 rounded-lg bg-slate-800/50 border border-slate-700">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div className="flex items-center gap-3">
-                        {log.step === "success" ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
+                        {log.success ? <CheckCircle2 className="h-4 w-4 text-green-500" /> : <XCircle className="h-4 w-4 text-red-500" />}
                         <div>
-                          <p className="text-xs md:text-sm font-medium text-foreground">{log.body?.queryId || 'N/A'}</p>
+                          <p className="text-xs md:text-sm font-medium text-foreground">{log.queryId || 'N/A'}</p>
                           <p className="text-xs text-muted-foreground mt-1">
-                            {new Date(log.timestamp).toLocaleString("tr-TR")}
+                            {new Date(log.timestamp.seconds * 1000).toLocaleString("tr-TR")}
                           </p>
                         </div>
                       </div>
-                      <Badge variant={log.step === "success" ? "default" : "destructive"} className="text-xs w-fit">
-                        {log.step}
+                      <Badge variant={log.success ? "default" : "destructive"} className="text-xs w-fit">
+                        {log.success ? "Başarılı" : "Hatalı"}
                       </Badge>
                     </div>
                   </div>

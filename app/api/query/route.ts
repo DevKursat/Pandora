@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from "next/server";
+import * as admin from 'firebase-admin';
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 import { UAParser } from 'ua-parser-js';
 
@@ -129,22 +130,27 @@ export async function POST(request: NextRequest) {
     const userData = userDoc.data();
 
     if (userRole === "demo") {
-      const today = new Date();
-      today.setUTCHours(0, 0, 0, 0);
+        const todayStr = new Date().toISOString().split('T')[0]; // YYYY-MM-DD formatında bugünün tarihi
+        const lastQueryDate = userData?.lastQueryDate;
+        let dailyQueryCount = userData?.dailyQueryCount || 0;
 
-      const queryLogsSnapshot = await adminDb.collection("queryLogs")
-        .where("uid", "==", uid)
-        .where("timestamp", ">=", today)
-        .get();
+        // Eğer son sorgu tarihi bugünden eskiyse, sayacı sıfırla
+        if (lastQueryDate !== todayStr) {
+            dailyQueryCount = 0;
+            await userDocRef.update({ dailyQueryCount: 0, lastQueryDate: todayStr });
+        }
 
-      const dailyQueryCount = queryLogsSnapshot.size;
-      const dailyLimit = userData?.queryLimit || 10;
+        const dailyLimit = userData?.queryLimit || 10;
 
-      if (dailyQueryCount >= dailyLimit) {
-        const errorMessage = "Günlük sorgu limiti aşıldı.";
-        await writeToLog(uid, queryId, false, errorMessage);
-        return NextResponse.json({ error: "Günlük sorgu limitinizi aştınız." }, { status: 429 });
-      }
+        if (dailyQueryCount >= dailyLimit) {
+            const errorMessage = "Günlük sorgu limiti aşıldı.";
+            await writeToLog(uid, queryId, false, errorMessage);
+            return NextResponse.json({ error: "Günlük sorgu limitinizi aştınız." }, { status: 429 });
+        }
+
+        // Sorgu başarılı olduğunda sayacı artır
+        // Bu artırma işlemini sorgu başarılı olduktan sonra yapacağız.
+        // Şimdilik bu kontrolü geçiyoruz.
     }
 
     if (userRole !== "admin" && userRole !== "vip") {
@@ -186,6 +192,12 @@ export async function POST(request: NextRequest) {
     }
 
     await writeToLog(uid, queryId, true, null);
+
+    // Demo kullanıcısının sorgu sayacını artır
+    if (userRole === "demo") {
+        const userDocRef = adminDb.collection("users").doc(uid);
+        await userDocRef.update({ dailyQueryCount: admin.firestore.FieldValue.increment(1) });
+    }
 
     const responseText = await response.text();
     try {

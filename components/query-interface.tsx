@@ -39,7 +39,16 @@ import {
   ChevronRight,
   Settings,
   UserCircle,
+  Bell,
 } from "lucide-react"
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogDescription,
+} from "@/components/ui/dialog"
 import { QueryResult } from "@/components/query-result"
 import { logout, isVipOrAdmin, User as AuthUser } from "@/lib/auth"
 import { SplashScreen } from "@/components/splash-screen"
@@ -47,6 +56,16 @@ import { useRouter } from "next/navigation"
 
 interface QueryInterfaceProps {
   user: AuthUser | null
+}
+
+interface Notification {
+  id: string;
+  message: string;
+  recipients: string;
+  createdAt: {
+    seconds: number;
+    nanoseconds: number;
+  };
 }
 
 const queryCategories = [
@@ -197,6 +216,41 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
 
   const [canExecuteQuery, setCanExecuteQuery] = useState(false);
   const [role, setRole] = useState("demo");
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isNotificationModalOpen, setIsNotificationModalOpen] = useState(false);
+
+  useEffect(() => {
+    const fetchNotifications = async () => {
+      if (!user) return;
+      try {
+        const token = await user.getIdToken();
+        const response = await fetch('/api/notifications', {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        if (response.ok) {
+          const data: Notification[] = await response.json();
+          setNotifications(data);
+
+          const readNotifications: string[] = JSON.parse(localStorage.getItem('readNotifications') || '[]');
+          const newUnreadCount = data.filter(n => !readNotifications.includes(n.id)).length;
+          setUnreadCount(newUnreadCount);
+        }
+      } catch (error) {
+        console.error("Failed to fetch notifications:", error);
+      }
+    };
+
+    fetchNotifications();
+  }, [user]);
+
+  const handleNotificationModalOpen = () => {
+    setIsNotificationModalOpen(true);
+    // Mark all as read
+    const allNotificationIds = notifications.map(n => n.id);
+    localStorage.setItem('readNotifications', JSON.stringify(allNotificationIds));
+    setUnreadCount(0);
+  };
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -352,6 +406,48 @@ export function QueryInterface({ user }: QueryInterfaceProps) {
               </div>
             </div>
             <div className="flex items-center gap-2 md:gap-4">
+              <Dialog open={isNotificationModalOpen} onOpenChange={setIsNotificationModalOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={handleNotificationModalOpen}
+                    className="relative hover:bg-slate-800 h-8 w-8 md:h-10 md:w-10"
+                  >
+                    <Bell className="h-4 w-4 md:h-5 md:w-5" />
+                    {unreadCount > 0 && (
+                      <Badge className="absolute -top-1 -right-1 h-4 w-4 text-xs p-0 flex items-center justify-center">
+                        {unreadCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="bg-slate-900 border-slate-800 max-h-[80vh] flex flex-col">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-primary"/> Bildirimler</DialogTitle>
+                        <DialogDescription>
+                            Sizin için gönderilen son bildirimler.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <ScrollArea className="flex-grow">
+                        <div className="space-y-3 pr-4">
+                            {notifications.length > 0 ? (
+                                notifications.map(n => (
+                                    <div key={n.id} className="p-3 rounded-lg bg-slate-800/50 border border-slate-700">
+                                        <p className="text-sm text-foreground mb-1">{n.message}</p>
+                                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                                          <Badge variant="outline">{n.recipients.toUpperCase()}</Badge>
+                                          <span>{new Date(n.createdAt.seconds * 1000).toLocaleString('tr-TR')}</span>
+                                        </div>
+                                    </div>
+                                ))
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center py-8">Yeni bildirim bulunmuyor.</p>
+                            )}
+                        </div>
+                    </ScrollArea>
+                </DialogContent>
+              </Dialog>
               <Button
                 variant="ghost"
                 size="icon"
